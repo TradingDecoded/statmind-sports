@@ -3,6 +3,35 @@
 import { fetchHistoricalAccuracy } from '@/utils/api';
 import StatsCard from '@/components/StatsCard';
 
+// frontend/src/app/accuracy/page.js
+// Add this export at the top of your existing file
+
+export const metadata = {
+  title: "Historical Accuracy - 79.7% Proven Track Record",
+  description: "Complete transparency: View our verified prediction accuracy since 2024. 79.7% overall accuracy across 256+ predictions. See detailed breakdowns by season, week, and confidence level.",
+  keywords: ["NFL prediction accuracy", "sports prediction track record", "verified NFL picks", "prediction performance", "betting accuracy"],
+  openGraph: {
+    title: "Historical Accuracy - 79.7% Proven Track Record | StatMind Sports",
+    description: "Complete transparency: 79.7% accuracy across 256+ NFL predictions. View detailed performance breakdowns.",
+    url: "https://statmindsports.com/accuracy",
+    type: "website",
+    images: [
+      {
+        url: "/og-accuracy.jpg",
+        width: 1200,
+        height: 630,
+        alt: "StatMind Sports Accuracy Statistics",
+      }
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "79.7% Proven Accuracy | StatMind Sports",
+    description: "Complete transparency: verified 79.7% accuracy across 256+ NFL predictions.",
+    images: ["/twitter-accuracy.jpg"],
+  },
+};
+
 export default async function AccuracyPage() {
   const accuracyData = await fetchHistoricalAccuracy();
   

@@ -1,8 +1,29 @@
 // frontend/src/app/about/page.js
 
 export const metadata = {
-  title: "About Us | StatMind Sports",
-  description: "Learn about StatMind Sports' proven 79.7% accuracy in NFL predictions and our transparent, data-driven methodology.",
+  title: "About StatMind Sports - Our Story",
+  description: "Built by a data scientist passionate about NFL analytics. StatMind Sports combines advanced algorithms with transparent results to deliver 79.7% accurate predictions.",
+  keywords: ["about StatMind", "NFL analytics platform", "sports prediction company", "data science NFL"],
+  openGraph: {
+    title: "About StatMind Sports - Our Story | StatMind Sports",
+    description: "Learn about the data science and passion behind StatMind's 79.7% accurate NFL predictions.",
+    url: "https://statmindsports.com/about",
+    type: "website",
+    images: [
+      {
+        url: "/og-about.jpg",
+        width: 1200,
+        height: 630,
+        alt: "About StatMind Sports",
+      }
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "About StatMind Sports",
+    description: "Data science and passion behind 79.7% accurate NFL predictions.",
+    images: ["/twitter-about.jpg"],
+  },
 };
 
 export default function AboutPage() {

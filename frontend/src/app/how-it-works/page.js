@@ -1,5 +1,31 @@
 // frontend/src/app/how-it-works/page.js
 
+export const metadata = {
+  title: "How Our 5-Component Algorithm Works",
+  description: "Learn how StatMind achieves 79.7% accuracy using a proven 5-component methodology: Elo ratings, rest analysis, weather impact, home advantage, and strength of schedule.",
+  keywords: ["NFL prediction algorithm", "sports analytics methodology", "Elo rating system", "NFL data science", "prediction model"],
+  openGraph: {
+    title: "How Our 5-Component Algorithm Works | StatMind Sports",
+    description: "Learn how we achieve 79.7% accuracy with our proven 5-component methodology for NFL predictions.",
+    url: "https://statmindsports.com/how-it-works",
+    type: "website",
+    images: [
+      {
+        url: "/og-how-it-works.jpg",
+        width: 1200,
+        height: 630,
+        alt: "StatMind Sports Methodology",
+      }
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "How Our 5-Component Algorithm Works",
+    description: "Learn the methodology behind 79.7% accuracy in NFL predictions.",
+    images: ["/twitter-how-it-works.jpg"],
+  },
+};
+
 export default function HowItWorksPage() {
   return (
     <div className="min-h-screen bg-slate-950">
