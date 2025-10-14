@@ -1,14 +1,4 @@
 // frontend/src/app/diagnostic/page.js
-
-export const metadata = {
-  title: "System Diagnostics",
-  description: "StatMind Sports system health and API diagnostics.",
-  robots: {
-    index: false,
-    follow: false,
-  },
-};
-
 'use client';
 
 import { useState, useEffect } from 'react';
