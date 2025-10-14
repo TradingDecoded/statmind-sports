@@ -45,6 +45,34 @@ export async function fetchUpcomingPredictions(limit = 10) {
 }
 
 /**
+ * Fetch historical accuracy data
+ */
+export async function fetchHistoricalAccuracy() {
+  try {
+    const response = await fetch(`${API_BASE_URL}/predictions/accuracy/historical`, {
+      cache: 'no-store' // Always get fresh data
+    });
+    
+    if (!response.ok) {
+      throw new Error(`API Error: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    
+    // Transform the data to match our component expectations
+    return {
+      overall: data.overall || {},
+      bySeason: data.bySeason || [],
+      byConfidence: data.byConfidence || [],
+      weeklyBreakdown: data.weeklyBreakdown || []
+    };
+  } catch (error) {
+    console.error('Error fetching historical accuracy:', error);
+    return null;
+  }
+}
+
+/**
  * Check backend health status
  */
 export async function checkBackendStatus() {
