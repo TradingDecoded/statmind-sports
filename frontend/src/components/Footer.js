@@ -1,3 +1,4 @@
+import Link from 'next/link';
 // frontend/src/components/Footer.js
 
 export default function Footer() {
@@ -27,10 +28,10 @@ export default function Footer() {
           <div>
             <h3 className="text-white font-semibold mb-4">Quick Links</h3>
             <ul className="space-y-2">
-              <li><a href="/" className="text-slate-400 hover:text-emerald-400 transition-colors">Home</a></li>
-              <li><a href="/predictions" className="text-slate-400 hover:text-emerald-400 transition-colors">Predictions</a></li>
-              <li><a href="/accuracy" className="text-slate-400 hover:text-emerald-400 transition-colors">Accuracy</a></li>
-              <li><a href="/how-it-works" className="text-slate-400 hover:text-emerald-400 transition-colors">How It Works</a></li>
+              <li><a href="/" className="text-slate-400 hover:text-emerald-400 transition-colors">Home</Link></li>
+              <li><a href="/predictions" className="text-slate-400 hover:text-emerald-400 transition-colors">Predictions</Link></li>
+              <li><a href="/accuracy" className="text-slate-400 hover:text-emerald-400 transition-colors">Accuracy</Link></li>
+              <li><a href="/how-it-works" className="text-slate-400 hover:text-emerald-400 transition-colors">How It Works</Link></li>
             </ul>
           </div>
           

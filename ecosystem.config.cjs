@@ -34,7 +34,7 @@ module.exports = {
     // ===============================
     {
       name: "statmind-frontend",
-      cwd: "./frontend",
+      cwd: "/root/statmind-sports/frontend",
       script: "node_modules/next/dist/bin/next",
       args: "start -p 3001",
       exec_mode: "fork",
