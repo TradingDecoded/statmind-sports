@@ -12,6 +12,7 @@ export default function Navigation() {
     { href: '/predictions', label: 'Predictions' },
     { href: '/accuracy', label: 'Accuracy' },
     { href: '/how-it-works', label: 'How It Works' },
+    { href: '/about', label: 'About' },  // 👈 ADD THIS LINE
   ];
   
   return (
