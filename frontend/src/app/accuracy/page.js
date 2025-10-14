@@ -56,46 +56,12 @@ export default async function AccuracyPage() {
               ></div>
             </div>
             <p className="text-slate-400 text-sm mt-4">
-              Spanning {overall.total_seasons} season{overall.total_seasons > 1 ? 's' : ''}
+              Spanning {overall.total_seasons} season{overall.total_seasons > 1 ? 's' : ''} · {overall.first_season} - {overall.latest_season}
             </p>
           </div>
         </div>
         
-        {/* Quick Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-          <StatsCard
-            title="Total Games Analyzed"
-            value={overall.total_predictions.toLocaleString()}
-            subtitle="Across all seasons"
-            icon={
-              <svg className="w-6 h-6 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-              </svg>
-            }
-          />
-          <StatsCard
-            title="Correct Predictions"
-            value={overall.correct_predictions.toLocaleString()}
-            subtitle="Winning picks"
-            icon={
-              <svg className="w-6 h-6 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            }
-          />
-          <StatsCard
-            title="Industry Benchmark"
-            value="~55%"
-            subtitle="Typical sports prediction accuracy"
-            icon={
-              <svg className="w-6 h-6 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-              </svg>
-            }
-          />
-        </div>
-        
-        {/* Performance by Season */}
+        {/* Season Breakdown */}
         {bySeason && bySeason.length > 0 && (
           <div className="bg-slate-800 rounded-xl border border-slate-700 p-6 md:p-8 mb-12">
             <h3 className="text-2xl font-bold mb-6 flex items-center">
@@ -109,35 +75,33 @@ export default async function AccuracyPage() {
                 <thead>
                   <tr className="border-b border-slate-700">
                     <th className="text-left py-3 px-4 text-slate-400 font-semibold">Season</th>
-                    <th className="text-center py-3 px-4 text-slate-400 font-semibold">Total Games</th>
+                    <th className="text-center py-3 px-4 text-slate-400 font-semibold">Games</th>
                     <th className="text-center py-3 px-4 text-slate-400 font-semibold">Correct</th>
                     <th className="text-center py-3 px-4 text-slate-400 font-semibold">Accuracy</th>
-                    <th className="text-right py-3 px-4 text-slate-400 font-semibold">Progress</th>
+                    <th className="text-right py-3 px-4 text-slate-400 font-semibold">Performance</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {bySeason.map((season, idx) => (
-                    <tr key={season.season} className={idx !== bySeason.length - 1 ? 'border-b border-slate-700/50' : ''}>
+                  {bySeason.map(season => (
+                    <tr key={season.season} className="border-b border-slate-700/50 hover:bg-slate-700/30 transition">
                       <td className="py-4 px-4">
-                        <span className="font-semibold text-white">{season.season}</span>
-                        {idx === 0 && (
-                          <span className="ml-2 px-2 py-1 bg-emerald-500/10 border border-emerald-500/30 rounded text-emerald-400 text-xs">
-                            Latest
-                          </span>
-                        )}
+                        <span className="text-white font-semibold">{season.season}</span>
                       </td>
-                      <td className="text-center py-4 px-4 text-slate-300">{season.total_predictions}</td>
-                      <td className="text-center py-4 px-4 text-emerald-400 font-semibold">{season.correct_predictions}</td>
+                      <td className="text-center py-4 px-4 text-slate-300">
+                        {season.total_predictions}
+                      </td>
+                      <td className="text-center py-4 px-4 text-emerald-400 font-semibold">
+                        {season.correct_predictions}
+                      </td>
                       <td className="text-center py-4 px-4">
-                        <span className={`font-bold ${season.accuracy_percentage >= 75 ? 'text-emerald-400' : season.accuracy_percentage >= 65 ? 'text-yellow-400' : 'text-orange-400'}`}>
-                          {season.accuracy_percentage}%
-                        </span>
+                        <span className="text-white font-bold text-lg">{season.accuracy_percentage}%</span>
                       </td>
                       <td className="py-4 px-4">
-                        <div className="flex items-center justify-end space-x-3">
+                        <div className="flex items-center justify-end gap-3">
                           <div className="w-32 bg-slate-700 rounded-full h-2 overflow-hidden">
                             <div 
-                              className={`h-full rounded-full ${season.accuracy_percentage >= 75 ? 'bg-gradient-to-r from-emerald-500 to-teal-500' : season.accuracy_percentage >= 65 ? 'bg-gradient-to-r from-yellow-500 to-orange-500' : 'bg-gradient-to-r from-orange-500 to-red-500'}`}
+                              className={`h-full rounded-full transition-all duration-1000 ${season.accuracy_percentage >= 75 ? 
+                                'bg-gradient-to-r from-emerald-500 to-teal-500' : season.accuracy_percentage >= 65 ? 'bg-gradient-to-r from-yellow-500 to-orange-500' : 'bg-gradient-to-r from-orange-500 to-red-500'}`}
                               style={{ width: `${season.accuracy_percentage}%` }}
                             ></div>
                           </div>
@@ -151,7 +115,7 @@ export default async function AccuracyPage() {
           </div>
         )}
         
-        {/* Confidence Level Breakdown */}
+        {/* Confidence Level Breakdown - FIXED */}
         {byConfidence && byConfidence.length > 0 && (
           <div className="bg-slate-800 rounded-xl border border-slate-700 p-6 md:p-8 mb-12">
             <h3 className="text-2xl font-bold mb-6 flex items-center">
@@ -165,18 +129,20 @@ export default async function AccuracyPage() {
             </p>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {byConfidence.map(conf => {
+                // FIXED: Use conf.confidence instead of conf.confidence_level
+                const confidenceLevel = conf.confidence;
                 const confidenceColors = {
                   'High': 'emerald',
                   'Medium': 'yellow',
                   'Low': 'orange'
                 };
-                const color = confidenceColors[conf.confidence_level] || 'slate';
+                const color = confidenceColors[confidenceLevel] || 'slate';
                 
                 return (
-                  <div key={conf.confidence_level} className={`bg-${color}-500/5 border border-${color}-500/30 rounded-xl p-6`}>
+                  <div key={confidenceLevel} className={`bg-${color}-500/5 border border-${color}-500/30 rounded-xl p-6`}>
                     <div className="flex items-center justify-between mb-4">
                       <span className={`text-${color}-400 font-semibold text-lg`}>
-                        {conf.confidence_level} Confidence
+                        {confidenceLevel} Confidence
                       </span>
                       <span className={`px-3 py-1 bg-${color}-500/20 border border-${color}-500/40 rounded-full text-${color}-400 text-sm font-bold`}>
                         {conf.accuracy_percentage}%
@@ -253,23 +219,6 @@ export default async function AccuracyPage() {
               <strong>Why this matters:</strong> Our {overall.accuracy_percentage}% accuracy rate is significantly above industry standards, 
               demonstrating the effectiveness of our 5-component prediction algorithm.
             </p>
-          </div>
-        </div>
-        
-        {/* Transparency Statement */}
-        <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl border border-slate-700 p-8 text-center">
-          <h3 className="text-2xl font-bold mb-4">Our Commitment to Transparency</h3>
-          <p className="text-slate-300 max-w-3xl mx-auto leading-relaxed">
-            Unlike many prediction services, we track and display <strong>every single prediction</strong> we make. 
-            We don&#39;t hide our losses or cherry-pick successes. This page updates automatically after each game, 
-            giving you an honest, real-time view of our performance. Trust is built through transparency, 
-            not marketing hype.
-          </p>
-          <div className="mt-6 flex items-center justify-center space-x-2 text-emerald-400">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-            </svg>
-            <span className="font-semibold">All data verified against official NFL results</span>
           </div>
         </div>
       </div>
