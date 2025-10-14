@@ -1,3 +1,4 @@
+// frontend/src/components/PredictionCard.js
 'use client';
 
 import { useState } from 'react';
@@ -21,12 +22,9 @@ export default function PredictionCard({ prediction }) {
   const gameDate = new Date(date);
   const isHomeWinner = predictedWinner === homeTeamKey;
   
-  // Convert probabilities: if they're decimals (0.680), multiply by 100
-  let homeProb = parseFloat(homeWinProbability) || 0;
-  let awayProb = parseFloat(awayWinProbability) || 0;
-  
-  if (homeProb < 1) homeProb = homeProb * 100;
-  if (awayProb < 1) awayProb = awayProb * 100;
+  // Parse probabilities to ensure they're numbers
+  const homeProb = parseFloat(homeWinProbability) || 0;
+  const awayProb = parseFloat(awayWinProbability) || 0;
   
   return (
     <div className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden hover:border-emerald-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-emerald-500/10">
@@ -36,7 +34,9 @@ export default function PredictionCard({ prediction }) {
           {gameDate.toLocaleDateString('en-US', { 
             weekday: 'short', 
             month: 'short', 
-            day: 'numeric'
+            day: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit'
           })}
         </p>
       </div>
@@ -50,6 +50,9 @@ export default function PredictionCard({ prediction }) {
               src={getTeamLogo(awayTeamKey)} 
               alt={getTeamName(awayTeamKey)}
               className="w-12 h-12 object-contain"
+              onError={(e) => {
+                e.target.src = '/images/nfl-logo.png'; // Fallback logo
+              }}
             />
             <div>
               <p className="text-white font-semibold">{awayTeamKey}</p>
@@ -70,12 +73,19 @@ export default function PredictionCard({ prediction }) {
               src={getTeamLogo(homeTeamKey)} 
               alt={getTeamName(homeTeamKey)}
               className="w-12 h-12 object-contain"
+              onError={(e) => {
+                e.target.src = '/images/nfl-logo.png'; // Fallback logo
+              }}
             />
           </div>
         </div>
         
         {/* Probability Bar */}
         <div className="mb-4">
+          <div className="flex items-center justify-between text-xs text-slate-400 mb-1">
+            <span>{awayTeamKey} Win Probability</span>
+            <span>{homeTeamKey} Win Probability</span>
+          </div>
           <div className="w-full bg-slate-700 rounded-full h-2 overflow-hidden flex">
             <div 
               className="bg-gradient-to-r from-blue-500 to-blue-400 transition-all duration-1000"

@@ -261,7 +261,7 @@ export default async function AccuracyPage() {
           <h3 className="text-2xl font-bold mb-4">Our Commitment to Transparency</h3>
           <p className="text-slate-300 max-w-3xl mx-auto leading-relaxed">
             Unlike many prediction services, we track and display <strong>every single prediction</strong> we make. 
-            We don't hide our losses or cherry-pick successes. This page updates automatically after each game, 
+            We don&#39;t hide our losses or cherry-pick successes. This page updates automatically after each game, 
             giving you an honest, real-time view of our performance. Trust is built through transparency, 
             not marketing hype.
           </p>
