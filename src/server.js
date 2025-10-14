@@ -1,33 +1,100 @@
+// ===============================
+//  StatMind Sports - API Server
+//  Phase 9: Performance Optimized (No Sentry)
+// ===============================
+
 import express from "express";
 import os from "os";
 import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
 import dotenv from "dotenv";
-import predictionsRouter from "./routes/predictions.js"; // ✅ active route
-import "./services/predictionScheduler.js"; // scheduler
-dotenv.config();
+import winston from "winston";
+import compression from "compression";
+import predictionsRouter from "./routes/predictions.js";
+import "./services/predictionScheduler.js";
 
+dotenv.config();
 const app = express();
 
-app.use(express.json());
-app.use(cors());
-app.use(helmet());
-app.use(morgan("dev"));
+// ======================================
+// Winston Logger Setup
+// ======================================
+const logger = winston.createLogger({
+  level: process.env.LOG_LEVEL || "info",
+  format: winston.format.combine(
+    winston.format.timestamp(),
+    winston.format.json()
+  ),
+  transports: [
+    new winston.transports.File({
+      filename: "/var/log/statmind/error.log",
+      level: "error",
+    }),
+    new winston.transports.File({
+      filename: "/var/log/statmind/combined.log",
+    }),
+  ],
+});
 
-// ===========================================
-// Backend Health Check Route
-// ===========================================
+if (process.env.NODE_ENV !== "production") {
+  logger.add(
+    new winston.transports.Console({
+      format: winston.format.simple(),
+    })
+  );
+}
+
+// ======================================
+// Express Middleware
+// ======================================
+
+// ✅ Enable gzip compression
+app.use(compression());
+
+// ✅ Restrict CORS in production, open in dev
+app.use(
+  cors({
+    origin:
+      process.env.NODE_ENV === "production"
+        ? "https://statmindsports.com"
+        : "*",
+  })
+);
+
+// ✅ Security headers
+app.use(helmet());
+
+// ✅ Parse JSON requests
+app.use(express.json());
+
+// ✅ Smart cache headers for GET requests
+app.use((req, res, next) => {
+  if (req.method === "GET" && req.path.startsWith("/api/")) {
+    if (req.path.includes("accuracy")) {
+      res.setHeader("Cache-Control", "public, max-age=300, s-maxage=300");
+    } else {
+      res.setHeader("Cache-Control", "public, max-age=60, s-maxage=60");
+    }
+  }
+  next();
+});
+
+// ✅ Logging with Winston via morgan
+app.use(
+  morgan("tiny", {
+    stream: { write: (msg) => logger.info(msg.trim()) },
+  })
+);
+
+// ======================================
+// Health Check Endpoint
+// ======================================
 app.get("/api/status", (req, res) => {
-  // Calculate uptime in hours/minutes
   const uptimeSeconds = process.uptime();
   const uptimeHours = Math.floor(uptimeSeconds / 3600);
   const uptimeMinutes = Math.floor((uptimeSeconds % 3600) / 60);
-
-  // Get memory usage
   const memoryUsageMB = (process.memoryUsage().rss / 1024 / 1024).toFixed(2);
-
-  // Calculate average CPU load (1-minute average)
   const cpuLoad = os.loadavg()[0].toFixed(2);
 
   res.json({
@@ -40,27 +107,33 @@ app.get("/api/status", (req, res) => {
       memory: `${memoryUsageMB} MB`,
       cpu_load: `${cpuLoad}`,
       platform: os.platform(),
-      hostname: os.hostname()
+      hostname: os.hostname(),
     },
     endpoints: [
       "/api/predictions",
-      "/api/predictions/week/:season/:week"
-    ]
+      "/api/predictions/week/:season/:week",
+      "/api/predictions/upcoming",
+    ],
   });
 });
 
-
-
-// Root endpoint (sanity check)
+// ======================================
+// Root Endpoint
+// ======================================
 app.get("/", (req, res) => {
   res.json({ success: true, message: "StatMind Sports API is running" });
 });
 
-// Predictions endpoints
+// ======================================
+// Predictions Route
+// ======================================
 app.use("/api/predictions", predictionsRouter);
 
-// Start server
+// ======================================
+// Start Server
+// ======================================
 const PORT = process.env.PORT || 4000;
-app.listen(PORT, () =>
-  console.log(`✅ StatMind Sports API running on port ${PORT}`)
-);
+app.listen(PORT, () => {
+  logger.info(`✅ StatMind Sports API running on port ${PORT}`);
+  console.log(`✅ StatMind Sports API running on port ${PORT}`);
+});
