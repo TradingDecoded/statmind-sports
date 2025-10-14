@@ -1,0 +1,13 @@
+# frontend/public/robots.txt
+
+# Allow all search engines to crawl all pages except diagnostic
+User-agent: *
+Allow: /
+Disallow: /diagnostic
+Disallow: /api/
+
+# Sitemap location
+Sitemap: https://statmindsports.com/sitemap.xml
+
+# Crawl delay (optional - helps prevent overloading your server)
+Crawl-delay: 1
