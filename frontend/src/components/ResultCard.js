@@ -1,155 +1,138 @@
 // frontend/src/components/ResultCard.js
 'use client';
 
-import { getTeamLogo } from '@/utils/teamLogos';
+import { useState } from 'react';
+import { getTeamLogo, getTeamName } from '@/utils/teamLogos';
+import ConfidenceBadge from './ConfidenceBadge';
+import GameDetailModal from './GameDetailModal';
 
 export default function ResultCard({ result }) {
+  const [showModal, setShowModal] = useState(false);
+  
   const {
     homeTeamKey,
     awayTeamKey,
-    homeTeamName,
-    awayTeamName,
-    homeScore,
-    awayScore,
     predictedWinner,
+    actualWinner,
     confidence,
     homeWinProbability,
     awayWinProbability,
-    actualWinner,
-    isCorrect,
-    date,
-    week,
-    season
+    homeScore,
+    awayScore,
+    date
   } = result;
-
-  // Determine winner
-  const homeWon = homeScore > awayScore;
-  const awayWon = awayScore > homeScore;
-  const predictionCorrect = isCorrect;
-
-  // Format date
+  
   const gameDate = new Date(date);
-  const formattedDate = gameDate.toLocaleDateString('en-US', { 
-    month: 'short', 
-    day: 'numeric',
-    year: 'numeric'
-  });
-
-  // Confidence styling
-  const confidenceColors = {
-    'High': 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30',
-    'Medium': 'text-yellow-400 bg-yellow-500/10 border-yellow-500/30',
-    'Low': 'text-orange-400 bg-orange-500/10 border-orange-500/30'
-  };
-
-  const confidenceColor = confidenceColors[confidence] || confidenceColors.Medium;
-
+  const wasCorrect = predictedWinner === actualWinner;
+  const isHomeWinner = actualWinner === homeTeamKey;
+  
+  // Convert probabilities
+  let homeProb = parseFloat(homeWinProbability) || 0;
+  let awayProb = parseFloat(awayWinProbability) || 0;
+  if (homeProb < 1) homeProb = homeProb * 100;
+  if (awayProb < 1) awayProb = awayProb * 100;
+  
   return (
-    <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl border border-slate-700 overflow-hidden hover:border-slate-600 transition-all duration-300 shadow-lg">
-      {/* Header with Result Status */}
-      <div className={`px-4 py-3 flex items-center justify-between border-b ${
-        predictionCorrect 
-          ? 'bg-emerald-500/10 border-emerald-500/20' 
-          : 'bg-red-500/10 border-red-500/20'
-      }`}>
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-slate-400">
-            {season} • Week {week} • {formattedDate}
-          </span>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className={`text-2xl ${predictionCorrect ? '' : 'opacity-50'}`}>
-            {predictionCorrect ? '✅' : '❌'}
-          </span>
-          <span className={`text-sm font-semibold ${
-            predictionCorrect ? 'text-emerald-400' : 'text-red-400'
+    <>
+      <div 
+        className={`bg-slate-800 rounded-xl border-2 overflow-hidden transition-all duration-300 hover:shadow-lg cursor-pointer ${
+          wasCorrect 
+            ? 'border-emerald-500/50 hover:border-emerald-500' 
+            : 'border-red-500/50 hover:border-red-500'
+        }`}
+        onClick={() => setShowModal(true)}
+      >
+        {/* Header with Result Badge */}
+        <div className={`px-4 py-2 border-b flex items-center justify-between ${
+          wasCorrect 
+            ? 'bg-emerald-500/10 border-emerald-500/30' 
+            : 'bg-red-500/10 border-red-500/30'
+        }`}>
+          <p className="text-slate-400 text-sm">
+            {gameDate.toLocaleDateString('en-US', { 
+              weekday: 'short', 
+              month: 'short', 
+              day: 'numeric',
+              year: 'numeric'
+            })}
+          </p>
+          <div className={`px-3 py-1 rounded-full text-xs font-bold ${
+            wasCorrect 
+              ? 'bg-emerald-500/20 text-emerald-400' 
+              : 'bg-red-500/20 text-red-400'
           }`}>
-            {predictionCorrect ? 'Correct' : 'Incorrect'}
-          </span>
+            {wasCorrect ? '✓ CORRECT' : '✗ INCORRECT'}
+          </div>
         </div>
-      </div>
-
-      {/* Game Matchup */}
-      <div className="p-6">
-        {/* Away Team */}
-        <div className={`flex items-center justify-between p-4 rounded-lg mb-3 ${
-          awayWon ? 'bg-slate-700/50 ring-2 ring-emerald-500/30' : 'bg-slate-800/50'
-        }`}>
-          <div className="flex items-center gap-4">
-            <img 
-              src={getTeamLogo(awayTeamKey)} 
-              alt={awayTeamName}
-              className="w-12 h-12 object-contain"
-            />
-            <div>
-              <div className="font-bold text-lg">{awayTeamName}</div>
-              {predictedWinner === awayTeamKey && (
-                <div className="flex items-center gap-2 mt-1">
-                  <span className="text-xs text-slate-400">Predicted Winner</span>
-                  <span className={`px-2 py-0.5 rounded text-xs font-semibold border ${confidenceColor}`}>
-                    {confidence} • {(awayWinProbability * 100).toFixed(1)}%
-                  </span>
-                </div>
-              )}
+        
+        {/* Teams with Scores */}
+        <div className="p-6">
+          <div className="flex items-center justify-between mb-4">
+            {/* Away Team */}
+            <div className="flex items-center space-x-3">
+              <img 
+                src={getTeamLogo(awayTeamKey)} 
+                alt={getTeamName(awayTeamKey)}
+                className="w-12 h-12 object-contain"
+              />
+              <div>
+                <p className="text-white font-semibold">{awayTeamKey}</p>
+                <p className="text-2xl font-bold text-white">{awayScore}</p>
+                {!isHomeWinner && <span className="text-emerald-400 text-xs">WINNER</span>}
+              </div>
+            </div>
+            
+            {/* VS */}
+            <div className="text-slate-500 font-bold">@</div>
+            
+            {/* Home Team */}
+            <div className="flex items-center space-x-3">
+              <div className="text-right">
+                <p className="text-white font-semibold">{homeTeamKey}</p>
+                <p className="text-2xl font-bold text-white">{homeScore}</p>
+                {isHomeWinner && <span className="text-emerald-400 text-xs">WINNER</span>}
+              </div>
+              <img 
+                src={getTeamLogo(homeTeamKey)} 
+                alt={getTeamName(homeTeamKey)}
+                className="w-12 h-12 object-contain"
+              />
             </div>
           </div>
-          <div className={`text-3xl font-bold ${awayWon ? 'text-emerald-400' : 'text-slate-400'}`}>
-            {awayScore}
-          </div>
-        </div>
-
-        {/* VS Divider */}
-        <div className="text-center text-slate-500 text-sm font-semibold mb-3">
-          FINAL
-        </div>
-
-        {/* Home Team */}
-        <div className={`flex items-center justify-between p-4 rounded-lg ${
-          homeWon ? 'bg-slate-700/50 ring-2 ring-emerald-500/30' : 'bg-slate-800/50'
-        }`}>
-          <div className="flex items-center gap-4">
-            <img 
-              src={getTeamLogo(homeTeamKey)} 
-              alt={homeTeamName}
-              className="w-12 h-12 object-contain"
-            />
-            <div>
-              <div className="font-bold text-lg">{homeTeamName}</div>
-              {predictedWinner === homeTeamKey && (
-                <div className="flex items-center gap-2 mt-1">
-                  <span className="text-xs text-slate-400">Predicted Winner</span>
-                  <span className={`px-2 py-0.5 rounded text-xs font-semibold border ${confidenceColor}`}>
-                    {confidence} • {(homeWinProbability * 100).toFixed(1)}%
-                  </span>
-                </div>
-              )}
+          
+          {/* Prediction Details */}
+          <div className="space-y-3 pt-4 border-t border-slate-700">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-slate-400">Our Prediction:</span>
+              <span className={`font-bold ${wasCorrect ? 'text-emerald-400' : 'text-red-400'}`}>
+                {predictedWinner} ({homeProb.toFixed(1)}% / {awayProb.toFixed(1)}%)
+              </span>
+            </div>
+            
+            <div className="flex items-center justify-center">
+              <ConfidenceBadge confidence={confidence} />
             </div>
           </div>
-          <div className={`text-3xl font-bold ${homeWon ? 'text-emerald-400' : 'text-slate-400'}`}>
-            {homeScore}
+          
+          {/* Click Hint */}
+          <div className="text-center pt-4 border-t border-slate-700 mt-4">
+            <p className="text-slate-400 text-sm flex items-center justify-center">
+              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+              </svg>
+              Click for full analysis
+            </p>
           </div>
         </div>
       </div>
 
-      {/* Prediction Summary */}
-      <div className={`px-6 py-4 border-t ${
-        predictionCorrect ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-red-500/5 border-red-500/20'
-      }`}>
-        <div className="flex items-center justify-between text-sm">
-          <div className="text-slate-400">
-            <span className="font-semibold">Predicted: </span>
-            <span className={predictionCorrect ? 'text-emerald-400' : 'text-red-400'}>
-              {predictedWinner === homeTeamKey ? homeTeamName : awayTeamName}
-            </span>
-          </div>
-          <div className="text-slate-400">
-            <span className="font-semibold">Actual: </span>
-            <span className="text-white">
-              {actualWinner === homeTeamKey ? homeTeamName : awayTeamName}
-            </span>
-          </div>
-        </div>
-      </div>
-    </div>
+      {/* Modal */}
+      <GameDetailModal 
+        prediction={result}
+        isOpen={showModal}
+        onClose={() => setShowModal(false)}
+      />
+    </>
   );
 }
