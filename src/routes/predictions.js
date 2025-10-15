@@ -314,4 +314,236 @@ router.get("/accuracy/historical", async (req, res) => {
   }
 });
 
+// -----------------------------
+// GET historical results with filters
+// -----------------------------
+router.get("/results", async (req, res) => {
+  const { season, week, confidence, sort = 'date' } = req.query;
+
+  try {
+    let query = `
+      SELECT 
+        g.game_id AS "gameId",
+        g.season,
+        g.week,
+        g.game_date AS "date",
+        g.home_team AS "homeTeamKey",
+        g.away_team AS "awayTeamKey",
+        g.home_score AS "homeScore",
+        g.away_score AS "awayScore",
+        ht.name AS "homeTeamName",
+        at.name AS "awayTeamName",
+        p.predicted_winner AS "predictedWinner",
+        p.confidence,
+        p.home_win_probability AS "homeWinProbability",
+        p.away_win_probability AS "awayWinProbability",
+        pr.actual_winner AS "actualWinner",
+        pr.is_correct AS "isCorrect"
+      FROM games g
+      INNER JOIN predictions p ON g.game_id = p.game_id
+      INNER JOIN prediction_results pr ON g.game_id = pr.game_id
+      LEFT JOIN teams ht ON g.home_team = ht.key
+      LEFT JOIN teams at ON g.away_team = at.key
+      WHERE g.home_score IS NOT NULL AND g.away_score IS NOT NULL
+    `;
+
+    const params = [];
+    let paramCount = 1;
+
+    // Add season filter
+    if (season) {
+      query += ` AND g.season = $${paramCount}`;
+      params.push(parseInt(season));
+      paramCount++;
+    }
+
+    // Add week filter
+    if (week) {
+      query += ` AND g.week = $${paramCount}`;
+      params.push(parseInt(week));
+      paramCount++;
+    }
+
+    // Add confidence filter
+    if (confidence && confidence.toUpperCase() !== 'ALL') {
+      query += ` AND UPPER(p.confidence) = $${paramCount}`;
+      params.push(confidence.toUpperCase());
+      paramCount++;
+    }
+
+    // Add sorting
+    switch (sort) {
+      case 'date':
+        query += ' ORDER BY g.game_date DESC, g.game_id DESC';
+        break;
+      case 'confidence':
+        query += ` ORDER BY 
+          CASE p.confidence 
+            WHEN 'High' THEN 1 
+            WHEN 'Medium' THEN 2 
+            WHEN 'Low' THEN 3 
+          END, g.game_date DESC`;
+        break;
+      case 'correct':
+        query += ' ORDER BY pr.is_correct DESC, g.game_date DESC';
+        break;
+      default:
+        query += ' ORDER BY g.game_date DESC';
+    }
+
+    const result = await pool.query(query, params);
+
+    // Calculate stats for filtered results
+    const total = result.rows.length;
+    const correct = result.rows.filter(r => r.isCorrect).length;
+    const accuracy = total > 0 ? ((correct / total) * 100).toFixed(1) : 0;
+
+    const confidenceBreakdown = {
+      high: { total: 0, correct: 0, accuracy: 0 },
+      medium: { total: 0, correct: 0, accuracy: 0 },
+      low: { total: 0, correct: 0, accuracy: 0 }
+    };
+
+    result.rows.forEach(row => {
+      const conf = row.confidence?.toLowerCase();
+      if (confidenceBreakdown[conf]) {
+        confidenceBreakdown[conf].total++;
+        if (row.isCorrect) {
+          confidenceBreakdown[conf].correct++;
+        }
+      }
+    });
+
+    // Calculate accuracy percentages
+    Object.keys(confidenceBreakdown).forEach(key => {
+      const stats = confidenceBreakdown[key];
+      stats.accuracy = stats.total > 0 
+        ? ((stats.correct / stats.total) * 100).toFixed(1) 
+        : 0;
+    });
+
+    res.json({
+      success: true,
+      count: total,
+      stats: {
+        total,
+        correct,
+        accuracy: parseFloat(accuracy),
+        byConfidence: confidenceBreakdown
+      },
+      results: result.rows
+    });
+  } catch (error) {
+    console.error("Error fetching results:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to fetch historical results"
+    });
+  }
+});
+
+// -----------------------------
+// GET available seasons and weeks for results
+// -----------------------------
+router.get("/results/available", async (req, res) => {
+  try {
+    const seasonsResult = await pool.query(`
+      SELECT DISTINCT g.season, 
+        MIN(g.week) as min_week, 
+        MAX(g.week) as max_week,
+        COUNT(*) as total_games
+      FROM games g
+      WHERE g.home_score IS NOT NULL AND g.away_score IS NOT NULL
+      GROUP BY g.season
+      ORDER BY g.season DESC
+    `);
+
+    const weeksResult = await pool.query(`
+      SELECT DISTINCT season, week, COUNT(*) as game_count
+      FROM games
+      WHERE home_score IS NOT NULL AND away_score IS NOT NULL
+      GROUP BY season, week
+      ORDER BY season DESC, week DESC
+    `);
+
+    res.json({
+      success: true,
+      seasons: seasonsResult.rows,
+      weeks: weeksResult.rows
+    });
+  } catch (error) {
+    console.error("Error fetching available data:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to fetch available seasons and weeks"
+    });
+  }
+});
+
+// -----------------------------
+// GET single game result details
+// -----------------------------
+router.get("/results/:gameId", async (req, res) => {
+  const { gameId } = req.params;
+
+  try {
+    const result = await pool.query(
+      `
+      SELECT 
+        g.game_id AS "gameId",
+        g.season,
+        g.week,
+        g.game_date AS "date",
+        g.home_team AS "homeTeamKey",
+        g.away_team AS "awayTeamKey",
+        g.home_score AS "homeScore",
+        g.away_score AS "awayScore",
+        ht.name AS "homeTeamName",
+        ht.city AS "homeTeamCity",
+        at.name AS "awayTeamName",
+        at.city AS "awayTeamCity",
+        p.predicted_winner AS "predictedWinner",
+        p.confidence,
+        p.home_win_probability AS "homeWinProbability",
+        p.away_win_probability AS "awayWinProbability",
+        p.reasoning,
+        p.elo_score AS "eloScore",
+        p.power_score AS "powerScore",
+        p.situational_score AS "situationalScore",
+        p.matchup_score AS "matchupScore",
+        p.recent_form_score AS "recentFormScore",
+        pr.actual_winner AS "actualWinner",
+        pr.is_correct AS "isCorrect"
+      FROM games g
+      INNER JOIN predictions p ON g.game_id = p.game_id
+      INNER JOIN prediction_results pr ON g.game_id = pr.game_id
+      LEFT JOIN teams ht ON g.home_team = ht.key
+      LEFT JOIN teams at ON g.away_team = at.key
+      WHERE g.game_id = $1 
+        AND g.home_score IS NOT NULL 
+        AND g.away_score IS NOT NULL
+      `,
+      [gameId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: "Game result not found"
+      });
+    }
+
+    res.json({
+      success: true,
+      result: result.rows[0]
+    });
+  } catch (error) {
+    console.error("Error fetching game result:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to fetch game result"
+    });
+  }
+});
+
 export default router;

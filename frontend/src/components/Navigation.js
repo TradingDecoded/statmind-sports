@@ -10,9 +10,10 @@ export default function Navigation() {
   const links = [
     { href: '/', label: 'Home' },
     { href: '/predictions', label: 'Predictions' },
+    { href: '/results', label: 'Results' },  // NEW LINK
     { href: '/accuracy', label: 'Accuracy' },
     { href: '/how-it-works', label: 'How It Works' },
-    { href: '/about', label: 'About' },  // 👈 ADD THIS LINE
+    { href: '/about', label: 'About' },
   ];
   
   return (

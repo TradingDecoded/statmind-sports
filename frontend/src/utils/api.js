@@ -1,6 +1,6 @@
 // frontend/src/utils/api.js
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://statmindsports.com/api';
 
 /**
  * Fetch predictions for a specific week and season
@@ -104,10 +104,93 @@ export function getCurrentSeasonWeek() {
   // This is a simplified version - you may want to make this more sophisticated
   const season = now.getMonth() >= 8 ? year : year - 1;
   
-  // Calculate approximate week (simplified)
+  // Calculate approximate week
   const seasonStart = new Date(season, 8, 1); // September 1st
   const weeksDiff = Math.floor((now - seasonStart) / (7 * 24 * 60 * 60 * 1000));
-  const week = Math.min(Math.max(weeksDiff + 1, 1), 18);
+  const week = Math.min(Math.max(weeksDiff + 1, 1), 18); // NFL has 18 weeks
   
   return { season, week };
+}
+
+// ============================================
+// NEW FUNCTIONS FOR HISTORICAL RESULTS
+// ============================================
+
+/**
+ * Fetch historical results with optional filters
+ */
+export async function fetchResults(filters = {}) {
+  const params = new URLSearchParams();
+  
+  if (filters.season) params.append('season', filters.season);
+  if (filters.week) params.append('week', filters.week);
+  if (filters.confidence && filters.confidence !== 'ALL') {
+    params.append('confidence', filters.confidence);
+  }
+  if (filters.sort) params.append('sort', filters.sort);
+
+  const response = await fetch(`${API_BASE_URL}/predictions/results?${params}`, {
+    cache: 'no-store'
+  });
+  
+  if (!response.ok) {
+    throw new Error('Failed to fetch results');
+  }
+
+  const data = await response.json();
+  
+  if (!data.success) {
+    throw new Error(data.error || 'Failed to fetch results');
+  }
+
+  return {
+    results: data.results,
+    stats: data.stats,
+    count: data.count
+  };
+}
+
+/**
+ * Fetch available seasons and weeks for results
+ */
+export async function fetchAvailableResultsData() {
+  const response = await fetch(`${API_BASE_URL}/predictions/results/available`, {
+    cache: 'no-store'
+  });
+  
+  if (!response.ok) {
+    throw new Error('Failed to fetch available data');
+  }
+
+  const data = await response.json();
+  
+  if (!data.success) {
+    throw new Error(data.error || 'Failed to fetch available data');
+  }
+
+  return {
+    seasons: data.seasons,
+    weeks: data.weeks
+  };
+}
+
+/**
+ * Fetch single game result details
+ */
+export async function fetchGameResult(gameId) {
+  const response = await fetch(`${API_BASE_URL}/predictions/results/${gameId}`, {
+    cache: 'no-store'
+  });
+  
+  if (!response.ok) {
+    throw new Error('Failed to fetch game result');
+  }
+
+  const data = await response.json();
+  
+  if (!data.success) {
+    throw new Error(data.error || 'Failed to fetch game result');
+  }
+
+  return data.result;
 }
