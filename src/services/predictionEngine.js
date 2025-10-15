@@ -360,6 +360,142 @@ class PredictionEngine {
   }
 
   /**
+   * Generate prediction for a SINGLE game with optional injury context
+   * This is used when regenerating after an injury is detected
+   */
+  async generateSingleGamePrediction(game, injuryContext = null) {
+    try {
+      const { home_team, away_team, game_id } = game;
+
+      console.log(`\n🎯 Generating single-game prediction: ${away_team} @ ${home_team}`);
+      if (injuryContext) {
+        console.log(`   📋 Injury context: ${injuryContext.playerName} (${injuryContext.position}) OUT`);
+      }
+
+      // Fetch team statistics
+      const homeStats = await this.getTeamStats(home_team);
+      const awayStats = await this.getTeamStats(away_team);
+
+      if (!homeStats || !awayStats) {
+        throw new Error(`Missing stats for ${home_team} or ${away_team}`);
+      }
+
+      // Calculate all 5 components (same as before)
+      const eloScore = this.calculateEloScore(homeStats, awayStats);
+      const powerScore = this.calculatePowerScore(homeStats, awayStats);
+      const situationalScore = this.calculateSituationalScore(homeStats, awayStats);
+      const matchupScore = this.calculateMatchupScore(homeStats, awayStats);
+      const recentFormScore = this.calculateRecentFormScore(homeStats, awayStats);
+
+      // Calculate weighted total score
+      const totalScore =
+        (eloScore * this.weights.elo) +
+        (powerScore * this.weights.power) +
+        (situationalScore * this.weights.situational) +
+        (matchupScore * this.weights.matchup) +
+        (recentFormScore * this.weights.recentForm);
+
+      // Convert to win probabilities
+      let homeWinProb = this.scoreToProbability(totalScore);
+      let awayWinProb = 1 - homeWinProb;
+
+      // ========================================
+      // APPLY INJURY PENALTY IF INJURY DETECTED
+      // ========================================
+      if (injuryContext) {
+        const { playerName, position, teamAbbr } = injuryContext;
+
+        console.log(`   🏥 Applying injury penalty for ${playerName} (${position})...`);
+
+        // Determine penalty based on position
+        let injuryPenalty = 0;
+
+        if (position === 'QB') {
+          // Scale QB penalty based on team quality (Elo rating)
+          const teamElo = teamAbbr === home_team ? homeStats.elo_rating : awayStats.elo_rating;
+
+          if (teamElo >= 1650) {
+            // Elite team - QB is critical (Chiefs, Bills, 49ers)
+            injuryPenalty = 0.28;
+            console.log(`   🌟 Elite team losing starting QB - major impact`);
+          } else if (teamElo >= 1500) {
+            // Playoff-caliber team - significant QB impact
+            injuryPenalty = 0.23;
+            console.log(`   ⭐ Good team losing starting QB - significant impact`);
+          } else {
+            // Average/weak team - still important but less critical
+            injuryPenalty = 0.18;
+            console.log(`   📊 Average team losing starting QB - notable impact`);
+          }
+        } else if (position === 'RB' || position === 'WR') {
+          injuryPenalty = 0.12; // 12% penalty for star skill position players
+        } else if (position === 'CB' || position === 'LB' || position === 'DE' || position === 'DT') {
+          injuryPenalty = 0.08; // 8% penalty for top defenders
+        } else {
+          injuryPenalty = 0.05; // 5% default penalty for other key players
+        }
+
+        // Apply penalty to the correct team
+        if (teamAbbr === home_team) {
+          homeWinProb = Math.max(0.05, homeWinProb - injuryPenalty); // Floor at 5%
+          awayWinProb = 1 - homeWinProb;
+          console.log(`   📉 ${home_team} win probability: ${(homeWinProb * 100).toFixed(1)}% (down ${(injuryPenalty * 100).toFixed(0)}% due to ${position} injury)`);
+        } else if (teamAbbr === away_team) {
+          awayWinProb = Math.max(0.05, awayWinProb - injuryPenalty); // Floor at 5%
+          homeWinProb = 1 - awayWinProb;
+          console.log(`   📉 ${away_team} win probability: ${(awayWinProb * 100).toFixed(1)}% (down ${(injuryPenalty * 100).toFixed(0)}% due to ${position} injury)`);
+        }
+      }
+      // ========================================
+      // END INJURY PENALTY
+      // ========================================
+
+      // Determine predicted winner and confidence
+      const predictedWinner = homeWinProb > 0.5 ? home_team : away_team;
+      const winnerProb = Math.max(homeWinProb, awayWinProb);
+      const confidence = this.determineConfidence(winnerProb);
+
+      // Build prediction data object WITH injury context
+      const predictionData = {
+        game_id,
+        home_team,
+        away_team,
+        predicted_winner: predictedWinner,
+        home_win_probability: homeWinProb,
+        away_win_probability: awayWinProb,
+        confidence,
+        eloScore,
+        powerScore,
+        situationalScore,
+        matchupScore,
+        recentFormScore,
+        homeStats,
+        awayStats,
+        injuryContext  // <-- PASS INJURY CONTEXT TO AI
+      };
+
+      // Generate AI reasoning (with injury awareness)
+      const reasoning = await aiReasoningService.generateReasoning(predictionData);
+
+      const prediction = {
+        ...predictionData,
+        reasoning
+      };
+
+      // Save to database
+      await this.savePrediction(prediction);
+
+      console.log(`✅ Single-game prediction complete: ${predictedWinner} (${Math.round(winnerProb * 100)}%)`);
+
+      return prediction;
+
+    } catch (error) {
+      console.error('❌ Error generating single-game prediction:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Generate predictions for all upcoming games
    */
   async generatePredictions(season = 2024, week = null) {

@@ -32,7 +32,7 @@ class AIReasoningService {
       // Calculate key metrics
       const favoredTeam = home_win_probability > 0.5 ? home_team : away_team;
       const winProbability = Math.round(Math.max(home_win_probability, away_win_probability) * 100);
-      
+
       // Build the prompt for Claude
       const prompt = this.buildAnalystPrompt(predictionData);
 
@@ -49,13 +49,13 @@ class AIReasoningService {
 
       // Extract the generated reasoning
       const reasoning = message.content[0].text.trim();
-      
+
       console.log(`✨ AI reasoning generated for ${away_team} @ ${home_team}`);
       return reasoning;
 
     } catch (error) {
       console.error('❌ Error generating AI reasoning:', error.message);
-      
+
       // Fallback to template-based reasoning if AI fails
       return this.generateFallbackReasoning(predictionData);
     }
@@ -78,7 +78,8 @@ class AIReasoningService {
       recentFormScore,
       homeStats,
       awayStats,
-      confidence
+      confidence,
+      injuryContext  // <-- NEW: Injury information
     } = data;
 
     const favoredTeam = home_win_probability > 0.5 ? home_team : away_team;
@@ -98,8 +99,17 @@ class AIReasoningService {
     componentScores.sort((a, b) => b.score - a.score);
     const topFactors = componentScores.slice(0, 3);
 
-    const prompt = `You are a professional NFL analyst writing a prediction analysis for StatMind Sports, a sports prediction platform with 79.7% historical accuracy.
+    // BUILD INJURY ALERT if injury context exists
+    let injuryAlert = '';
+    if (injuryContext) {
+      injuryAlert = `\n🚨 **CRITICAL INJURY UPDATE:**
+${injuryContext.playerName} (${injuryContext.teamAbbr} ${injuryContext.position}) is ruled OUT for this game.
+This is a key player absence that significantly impacts the prediction. You MUST mention this injury in your analysis.
+`;
+    }
 
+    const prompt = `You are a professional NFL analyst writing a prediction analysis for StatMind Sports, a sports prediction platform with 79.7% historical accuracy.
+${injuryAlert}
 **Game:** ${away_team} @ ${home_team}
 
 **Prediction:** ${predicted_winner} to win with ${winProbability}% probability (${confidence} confidence)
@@ -132,7 +142,7 @@ ${topFactors.map((f, i) => `${i + 1}. ${f.name} (${f.weight} weight): ${f.raw > 
 
 **Write a 3-4 sentence professional analyst-style prediction reasoning that:**
 1. States the pick and win probability upfront
-2. Highlights 2-3 key factors from the analysis
+2. ${injuryContext ? '**MUST mention the injury impact first**' : 'Highlights 2-3 key factors from the analysis'}
 3. Uses concrete numbers from the statistics
 4. Sounds natural and engaging, like an ESPN analyst
 5. Is informative but concise
@@ -143,6 +153,7 @@ ${topFactors.map((f, i) => `${i + 1}. ${f.name} (${f.weight} weight): ${f.raw > 
 - Use analyst language: "edge," "advantage," "matchup," "trendy," etc.
 - Include specific statistics to support claims
 - NO generic phrases - be specific to this matchup
+${injuryContext ? '- MUST reference the injury in your first sentence' : ''}
 - Keep it under 100 words
 
 Write ONLY the prediction reasoning, no preamble or extra commentary:`;
@@ -179,7 +190,7 @@ Write ONLY the prediction reasoning, no preamble or extra commentary:`;
 
     factors.sort((a, b) => b.score - a.score);
     const topFactors = factors.filter(f => f.favorable).slice(0, 2);
-    
+
     if (topFactors.length > 0) {
       reasoning += 'Key factors: ' + topFactors.map(f => f.name).join(', ') + '.';
     }

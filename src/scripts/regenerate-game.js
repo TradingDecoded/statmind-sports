@@ -3,14 +3,17 @@ import pool from '../config/database.js';
 
 /**
  * Regenerate prediction for a specific game
- * Usage: node src/scripts/regenerate-game.js AWAY HOME
- * Example: node src/scripts/regenerate-game.js LV KC
+ * Usage: node src/scripts/regenerate-game.js AWAY HOME [PLAYER] [POSITION]
+ * Example: node src/scripts/regenerate-game.js LV KC "Patrick Mahomes" QB
  */
 
-async function regenerateGame(awayTeam, homeTeam) {
+async function regenerateGame(awayTeam, homeTeam, injuredPlayer = null, position = null) {
   console.log('\n🔄 ========================================');
   console.log(`   REGENERATING PREDICTION`);
   console.log(`   ${awayTeam} @ ${homeTeam}`);
+  if (injuredPlayer) {
+    console.log(`   🚨 Injury: ${injuredPlayer} (${position}) OUT`);
+  }
   console.log('========================================\n');
 
   try {
@@ -48,10 +51,42 @@ async function regenerateGame(awayTeam, homeTeam) {
       console.log(`🗑️  Deleted old prediction\n`);
     }
 
-    // Generate new prediction
+    // Build injury context if provided
+    let injuryContext = null;
+    if (injuredPlayer && position) {
+      // Try to determine which team based on player name
+      // For manual testing, we'll check both teams' rosters in future
+      // For now, let's make it a required 6th parameter
+      let teamAbbr = process.argv[6]; // Optional 6th argument
+      
+      if (!teamAbbr) {
+        // If not provided, default to away team but show warning
+        teamAbbr = awayTeam;
+        console.log(`⚠️  Team not specified for ${injuredPlayer}, defaulting to ${awayTeam}\n`);
+      }
+      
+      injuryContext = {
+        playerName: injuredPlayer,
+        position: position,
+        teamAbbr: teamAbbr
+      };
+    }
+
+    // Build complete game object with all required properties
+    const gameObject = {
+      game_id: game.game_id,
+      home_team: homeTeam,
+      away_team: awayTeam,
+      season: game.season,
+      week: game.week,
+      game_date: game.game_date,
+      status: game.status
+    };
+
+    // Generate new prediction using SINGLE-GAME function
     console.log(`🤖 Generating new prediction with AI analysis...\n`);
     
-    await predictionEngine.generatePredictions(game.season, game.week);
+    await predictionEngine.generateSingleGamePrediction(gameObject, injuryContext);
 
     console.log(`✅ New prediction generated!\n`);
 
@@ -71,7 +106,7 @@ async function regenerateGame(awayTeam, homeTeam) {
       console.log(`   ${homeTeam} Win Probability: ${(pred.home_win_probability * 100).toFixed(1)}%`);
       console.log(`   ${awayTeam} Win Probability: ${(pred.away_win_probability * 100).toFixed(1)}%`);
       console.log(`\n   AI Reasoning Preview:`);
-      console.log(`   ${pred.reasoning.substring(0, 200)}...\n`);
+      console.log(`   ${pred.reasoning.substring(0, 300)}...\n`);
     }
 
     console.log('========================================');
@@ -90,12 +125,15 @@ async function regenerateGame(awayTeam, homeTeam) {
 // Get command line arguments
 const awayTeam = process.argv[2];
 const homeTeam = process.argv[3];
+const injuredPlayer = process.argv[4] || null;
+const position = process.argv[5] || null;
 
 if (!awayTeam || !homeTeam) {
-  console.log('\n❌ Usage: node src/scripts/regenerate-game.js AWAY HOME');
-  console.log('   Example: node src/scripts/regenerate-game.js LV KC\n');
+  console.log('\n❌ Usage: node src/scripts/regenerate-game.js AWAY HOME [PLAYER] [POSITION] [TEAM]');
+  console.log('   Example: node src/scripts/regenerate-game.js LV KC');
+  console.log('   Example: node src/scripts/regenerate-game.js LV KC "Patrick Mahomes" QB KC\n');
   process.exit(1);
 }
 
 // Run regeneration
-regenerateGame(awayTeam.toUpperCase(), homeTeam.toUpperCase());
+regenerateGame(awayTeam.toUpperCase(), homeTeam.toUpperCase(), injuredPlayer, position);
