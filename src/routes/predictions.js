@@ -94,7 +94,12 @@ router.get("/upcoming", async (req, res) => {
         p.confidence,
         p.home_win_probability AS "homeWinProbability",
         p.away_win_probability AS "awayWinProbability",
-        p.reasoning
+        p.reasoning,
+        p.elo_score AS "eloScore",
+        p.power_score AS "powerScore",
+        p.situational_score AS "situationalScore",
+        p.matchup_score AS "matchupScore",
+        p.recent_form_score AS "recentFormScore"
       FROM predictions p
       JOIN games g ON p.game_id = g.game_id
       LEFT JOIN teams ht ON g.home_team = ht.key

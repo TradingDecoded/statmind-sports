@@ -54,14 +54,11 @@ if (process.env.NODE_ENV !== "production") {
 app.use(compression());
 
 // ✅ Restrict CORS in production, open in dev
-app.use(
-  cors({
-    origin:
-      process.env.NODE_ENV === "production"
-        ? "https://statmindsports.com"
-        : "*",
-  })
-);
+// ✅ Allow all origins for development
+app.use(cors({
+  origin: true,
+  credentials: true
+}));
 
 // ✅ Security headers
 app.use(helmet());

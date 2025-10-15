@@ -7,6 +7,7 @@ import ConfidenceBadge from './ConfidenceBadge';
 import GameDetailModal from './GameDetailModal';
 
 export default function PredictionCard({ prediction }) {
+  console.log('PredictionCard received:', prediction);
   const [showModal, setShowModal] = useState(false);
   
   const {

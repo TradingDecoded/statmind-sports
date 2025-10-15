@@ -97,8 +97,9 @@ export default function PredictionsPage() {
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-2">Season</label>
               <select value={season} onChange={(e) => setSeason(Number(e.target.value))} className="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all cursor-pointer">
-                <option value={2024}>2024 Season</option>
-                <option value={2025}>2025 Season</option>
+                {[2025, 2024, 2023, 2022, 2021, 2020].map(year => (
+                  <option key={year} value={year}>{year} Season</option>
+                ))}
               </select>
             </div>
             
