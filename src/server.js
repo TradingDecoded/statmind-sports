@@ -13,6 +13,7 @@ import winston from "winston";
 import compression from "compression";
 import predictionsRouter from "./routes/predictions.js";
 import "./services/predictionScheduler.js";
+import adminRouter from "./routes/admin.js";
 
 dotenv.config();
 const app = express();
@@ -128,6 +129,7 @@ app.get("/", (req, res) => {
 // Predictions Route
 // ======================================
 app.use("/api/predictions", predictionsRouter);
+app.use("/api/admin", adminRouter);
 
 // ======================================
 // Start Server

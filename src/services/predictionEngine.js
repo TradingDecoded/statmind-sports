@@ -3,7 +3,7 @@ import pool from '../config/database.js';
 
 class PredictionEngine {
   constructor() {
-    // Optimized weights from backtesting (61.9% accuracy)
+    // Default weights (will be loaded from database)
     this.weights = {
       elo: 0.35,
       power: 0.15,
@@ -11,6 +11,34 @@ class PredictionEngine {
       matchup: 0.20,
       recentForm: 0.05
     };
+    
+    // Load weights from database on startup
+    this.loadWeights();
+  }
+
+  /**
+   * Load current weights from database
+   */
+  async loadWeights() {
+    try {
+      const result = await pool.query('SELECT weight_name, weight_value FROM prediction_weights');
+      
+      if (result.rows.length > 0) {
+        result.rows.forEach(row => {
+          this.weights[row.weight_name] = parseFloat(row.weight_value);
+        });
+        console.log('✅ Loaded weights from database:', this.weights);
+      }
+    } catch (error) {
+      console.error('⚠️  Failed to load weights from database, using defaults:', error.message);
+    }
+  }
+
+  /**
+   * Reload weights from database (call this after updating weights)
+   */
+  async reloadWeights() {
+    await this.loadWeights();
   }
 
   /**
@@ -369,6 +397,13 @@ class PredictionEngine {
       console.error('Error generating predictions:', error);
       throw error;
     }
+  }
+  /**
+   * Update weights from admin panel
+   */
+  async updateWeights(newWeights) {
+    this.weights = { ...newWeights };
+    console.log('✅ Weights updated in memory:', this.weights);
   }
 }
 
