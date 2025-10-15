@@ -1,6 +1,7 @@
 import cron from "node-cron";
 import predictionEngine from "./predictionEngine.js";
 import espnDataService from "./espnDataService.js";
+import { monitorInjuries } from '../scripts/injury-monitor.js';
 
 console.log("📅 Smart Scheduler initialized...");
 
@@ -33,33 +34,23 @@ cron.schedule("0 8 * * 2", async () => {
   }
 });
 
-// WEDNESDAY 8:00 PM - Mid-week injury check
-cron.schedule("0 20 * * 3", async () => {
-  console.log("⏰ WEDNESDAY 8 PM: Checking for injury updates...");
+// Wednesday 8 PM - Injury check
+cron.schedule('0 20 * * 3', async () => {
+  console.log('🏥 Wednesday 8 PM - Injury check...');
   try {
-    const { currentWeek, season } = getCurrentWeekInfo();
-    console.log(`🏥 Scanning for injuries affecting Week ${currentWeek} games...`);
-    
-    // TODO: Implement injury detection in Phase 2
-    console.log("⚠️ Injury monitoring coming soon - use manual regeneration for now");
-    
+    await monitorInjuries();
   } catch (error) {
-    console.error("❌ Error in Wednesday injury check:", error);
+    console.error('❌ Wednesday injury check failed:', error);
   }
 });
 
-// SATURDAY 8:00 PM - Final injury check before Sunday games
-cron.schedule("0 20 * * 6", async () => {
-  console.log("⏰ SATURDAY 8 PM: Final injury check before Sunday games...");
+// Saturday 8 PM - Injury check
+cron.schedule('0 20 * * 6', async () => {
+  console.log('🏥 Saturday 8 PM - Injury check...');
   try {
-    const { currentWeek, season } = getCurrentWeekInfo();
-    console.log(`🏥 Final injury scan for Week ${currentWeek} games...`);
-    
-    // TODO: Implement injury detection in Phase 2
-    console.log("⚠️ Injury monitoring coming soon - use manual regeneration for now");
-    
+    await monitorInjuries();
   } catch (error) {
-    console.error("❌ Error in Saturday injury check:", error);
+    console.error('❌ Saturday injury check failed:', error);
   }
 });
 
