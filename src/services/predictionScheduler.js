@@ -1,6 +1,5 @@
 import cron from "node-cron";
 import predictionEngine from "./predictionEngine.js";
-import espnDataService from "./espnDataService.js";
 import { monitorInjuries } from '../scripts/injury-monitor.js';
 
 console.log("📅 Smart Scheduler initialized...");
