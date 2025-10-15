@@ -17,18 +17,18 @@ function getCurrentSeasonWeek() {
 
 export default function PredictionsPage() {
   const { season: currentSeason, week: currentWeek } = getCurrentSeasonWeek();
-  
+
   const [season, setSeason] = useState(currentSeason);
   const [week, setWeek] = useState(currentWeek);
   const [predictions, setPredictions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [confidenceFilter, setConfidenceFilter] = useState('ALL');
   const [sortBy, setSortBy] = useState('date');
-  
+
   useEffect(() => {
     loadPredictions();
   }, [season, week]);
-  
+
   async function loadPredictions() {
     setLoading(true);
     try {
@@ -41,12 +41,12 @@ export default function PredictionsPage() {
     }
     setLoading(false);
   }
-  
+
   const filteredPredictions = predictions.filter(pred => {
     if (confidenceFilter === 'ALL') return true;
     return pred.confidence?.toUpperCase() === confidenceFilter;
   });
-  
+
   const sortedPredictions = [...filteredPredictions].sort((a, b) => {
     switch (sortBy) {
       case 'date':
@@ -64,9 +64,9 @@ export default function PredictionsPage() {
         return 0;
     }
   });
-  
+
   const highConfidenceCount = filteredPredictions.filter(p => p.confidence?.toUpperCase() === 'HIGH').length;
-  
+
   let avgProbability = 0;
   if (filteredPredictions.length > 0) {
     const sum = filteredPredictions.reduce((sum, p) => {
@@ -76,7 +76,7 @@ export default function PredictionsPage() {
     }, 0);
     avgProbability = (sum / filteredPredictions.length).toFixed(1);
   }
-  
+
   return (
     <div className="min-h-screen py-12 px-4">
       <div className="max-w-7xl mx-auto">
@@ -91,7 +91,7 @@ export default function PredictionsPage() {
             Browse predictions by season and week with advanced filtering and sorting options
           </p>
         </div>
-        
+
         <div className="bg-slate-800 rounded-xl border border-slate-700 p-6 mb-8">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <div>
@@ -102,7 +102,7 @@ export default function PredictionsPage() {
                 ))}
               </select>
             </div>
-            
+
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-2">Week</label>
               <select value={week} onChange={(e) => setWeek(Number(e.target.value))} className="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all cursor-pointer">
@@ -111,7 +111,7 @@ export default function PredictionsPage() {
                 ))}
               </select>
             </div>
-            
+
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-2">Confidence Level</label>
               <select value={confidenceFilter} onChange={(e) => setConfidenceFilter(e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all cursor-pointer">
@@ -121,7 +121,7 @@ export default function PredictionsPage() {
                 <option value="LOW">Low Confidence</option>
               </select>
             </div>
-            
+
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-2">Sort By</label>
               <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all cursor-pointer">
@@ -132,7 +132,7 @@ export default function PredictionsPage() {
             </div>
           </div>
         </div>
-        
+
         {!loading && filteredPredictions.length > 0 && (
           <div className="bg-gradient-to-r from-emerald-900/20 to-teal-900/20 border border-emerald-500/30 rounded-xl p-6 mb-8">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-center">
@@ -141,8 +141,12 @@ export default function PredictionsPage() {
                 <p className="text-white text-2xl font-bold">{filteredPredictions.length}</p>
               </div>
               <div>
-                <p className="text-slate-400 text-sm mb-1">High Confidence</p>
-                <p className="text-emerald-400 text-2xl font-bold">{highConfidenceCount}</p>
+                <p className="text-slate-400 text-sm mb-1">
+                  {confidenceFilter === 'ALL' ? 'High Confidence' : confidenceFilter.charAt(0) + confidenceFilter.slice(1).toLowerCase() + ' Confidence'}
+                </p>
+                <p className="text-emerald-400 text-2xl font-bold">
+                  {confidenceFilter === 'ALL' ? highConfidenceCount : filteredPredictions.length}
+                </p>
               </div>
               <div>
                 <p className="text-slate-400 text-sm mb-1">Avg Win Probability</p>
@@ -151,14 +155,14 @@ export default function PredictionsPage() {
             </div>
           </div>
         )}
-        
+
         <div className="flex items-center justify-between mb-6">
           <p className="text-slate-400">
             Showing <span className="text-white font-semibold">{sortedPredictions.length}</span> prediction{sortedPredictions.length !== 1 ? 's' : ''}
             {confidenceFilter !== 'ALL' && <span className="text-emerald-400"> · {confidenceFilter} confidence</span>}
           </p>
         </div>
-        
+
         {loading ? (
           <div className="text-center py-20">
             <div className="inline-block w-16 h-16 border-4 border-slate-600 border-t-emerald-500 rounded-full animate-spin"></div>

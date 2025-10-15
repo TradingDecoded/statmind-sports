@@ -1,5 +1,6 @@
 // src/services/predictionEngine.js
 import pool from '../config/database.js';
+import aiReasoningService from './aiReasoningService.js';
 
 class PredictionEngine {
   constructor() {
@@ -11,7 +12,7 @@ class PredictionEngine {
       matchup: 0.20,
       recentForm: 0.05
     };
-    
+
     // Load weights from database on startup
     this.loadWeights();
   }
@@ -22,7 +23,7 @@ class PredictionEngine {
   async loadWeights() {
     try {
       const result = await pool.query('SELECT weight_name, weight_value FROM prediction_weights');
-      
+
       if (result.rows.length > 0) {
         result.rows.forEach(row => {
           this.weights[row.weight_name] = parseFloat(row.weight_value);
@@ -64,7 +65,7 @@ class PredictionEngine {
       const recentFormScore = this.calculateRecentFormScore(homeStats, awayStats);
 
       // Calculate weighted total score
-      const totalScore = 
+      const totalScore =
         (eloScore * this.weights.elo) +
         (powerScore * this.weights.power) +
         (situationalScore * this.weights.situational) +
@@ -80,17 +81,21 @@ class PredictionEngine {
       const winnerProb = Math.max(homeWinProb, awayWinProb);
       const confidence = this.determineConfidence(winnerProb);
 
-      // Generate reasoning
-      const reasoning = this.generateReasoning({
+      // Generate AI-powered reasoning
+      const reasoning = await aiReasoningService.generateReasoning({
         home_team,
         away_team,
+        predicted_winner: predictedWinner,
+        home_win_probability: homeWinProb,
+        away_win_probability: awayWinProb,
         eloScore,
         powerScore,
         situationalScore,
         matchupScore,
         recentFormScore,
-        totalScore,
-        homeWinProb
+        homeStats,
+        awayStats,
+        confidence
       });
 
       return {
@@ -129,10 +134,10 @@ class PredictionEngine {
   calculatePowerScore(homeStats, awayStats) {
     // Home team's combined power (offense + adjusted defense)
     const homePower = (homeStats.offensive_rating + (100 - awayStats.defensive_rating)) / 2;
-    
+
     // Away team's combined power
     const awayPower = (awayStats.offensive_rating + (100 - homeStats.defensive_rating)) / 2;
-    
+
     // Convert to -50 to +50 scale
     const powerScore = ((homePower - awayPower) / 100) * 50;
     return Math.max(-50, Math.min(50, powerScore));
@@ -145,7 +150,7 @@ class PredictionEngine {
   calculateSituationalScore(homeStats, awayStats) {
     const homeWinRate = homeStats.home_wins / Math.max(homeStats.home_games, 1);
     const awayWinRate = awayStats.away_wins / Math.max(awayStats.away_games, 1);
-    
+
     const situationalScore = (homeWinRate - awayWinRate) * 30;
     return Math.max(-30, Math.min(30, situationalScore));
   }
@@ -157,10 +162,10 @@ class PredictionEngine {
   calculateMatchupScore(homeStats, awayStats) {
     // Home offense vs Away defense
     const homeOffenseAdvantage = homeStats.offensive_rating - awayStats.defensive_rating;
-    
+
     // Away offense vs Home defense
     const awayOffenseAdvantage = awayStats.offensive_rating - homeStats.defensive_rating;
-    
+
     // Net advantage for home team
     const matchupScore = (homeOffenseAdvantage - awayOffenseAdvantage) / 5;
     return Math.max(-40, Math.min(40, matchupScore));
@@ -173,7 +178,7 @@ class PredictionEngine {
   calculateRecentFormScore(homeStats, awayStats) {
     const homeWinRate = homeStats.wins / Math.max(homeStats.total_games, 1);
     const awayWinRate = awayStats.wins / Math.max(awayStats.total_games, 1);
-    
+
     const recentFormScore = (homeWinRate - awayWinRate) * 50;
     return Math.max(-50, Math.min(50, recentFormScore));
   }
@@ -185,10 +190,10 @@ class PredictionEngine {
   scoreToProbability(score) {
     // Normalize score (typical range is -30 to +30 after weighting)
     const normalizedScore = score / 15;
-    
+
     // Logistic function: 1 / (1 + e^(-score))
     const probability = 1 / (1 + Math.exp(-normalizedScore));
-    
+
     return Math.max(0, Math.min(1, probability));
   }
 
@@ -205,15 +210,15 @@ class PredictionEngine {
    * Generate human-readable reasoning for the prediction
    */
   generateReasoning(data) {
-    const { 
-      home_team, 
-      away_team, 
-      eloScore, 
-      powerScore, 
+    const {
+      home_team,
+      away_team,
+      eloScore,
+      powerScore,
       situationalScore,
       matchupScore,
       recentFormScore,
-      homeWinProb 
+      homeWinProb
     } = data;
 
     const favored = homeWinProb > 0.5 ? home_team : away_team;
@@ -268,7 +273,7 @@ class PredictionEngine {
       `;
 
       const result = await pool.query(query, [teamKey]);
-      
+
       if (result.rows.length === 0) {
         console.warn(`No stats found for team: ${teamKey}`);
         return null;
