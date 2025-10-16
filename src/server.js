@@ -15,6 +15,7 @@ import predictionsRouter from "./routes/predictions.js";
 import statsRoutes from "./routes/stats.js";
 import "./services/predictionScheduler.js";
 import adminRouter from "./routes/admin.js";
+import analyticsRouter from "./routes/analytics.js";
 
 dotenv.config();
 const app = express();
@@ -129,6 +130,7 @@ app.get("/", (req, res) => {
 app.use("/api/predictions", predictionsRouter);
 app.use("/api/stats", statsRoutes);
 app.use("/api/admin", adminRouter);
+app.use("/api/analytics", analyticsRouter);
 
 // ======================================
 // Start Server

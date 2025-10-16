@@ -1,6 +1,5 @@
 // frontend/src/components/Navigation.js
 'use client';
-
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
@@ -10,7 +9,8 @@ export default function Navigation() {
   const links = [
     { href: '/', label: 'Home' },
     { href: '/predictions', label: 'Predictions' },
-    { href: '/results', label: 'Results' },  // NEW LINK
+    { href: '/results', label: 'Results' },
+    { href: '/analytics', label: 'Analytics' },  // NEW ANALYTICS LINK
     { href: '/accuracy', label: 'Accuracy' },
     { href: '/how-it-works', label: 'How It Works' },
     { href: '/about', label: 'About' },
