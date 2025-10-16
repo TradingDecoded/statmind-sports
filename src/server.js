@@ -17,6 +17,7 @@ import "./services/predictionScheduler.js";
 import adminRouter from "./routes/admin.js";
 import analyticsRouter from "./routes/analytics.js";
 import authRoutes from './routes/auth.js';
+import parlayRoutes from './routes/parlay.js';
 
 dotenv.config();
 const app = express();
@@ -133,6 +134,7 @@ app.use("/api/stats", statsRoutes);
 app.use("/api/admin", adminRouter);
 app.use("/api/analytics", analyticsRouter);
 app.use('/api/auth', authRoutes);
+app.use('/api/parlay', parlayRoutes);
 
 // ======================================
 // Start Server
