@@ -198,12 +198,13 @@ class PredictionEngine {
   }
 
   /**
-   * Determine confidence level based on win probability
-   */
+ * Determine confidence level based on win probability
+ * RECALIBRATED: Stricter thresholds for better accuracy correlation
+ */
   determineConfidence(probability) {
-    if (probability >= 0.65) return 'High';
-    if (probability >= 0.55) return 'Medium';
-    return 'Low';
+    if (probability >= 0.70) return 'High';    // 70%+ = High Confidence
+    if (probability >= 0.60) return 'Medium';  // 60-69% = Medium Confidence
+    return 'Low';                               // <60% = Low Confidence
   }
 
   /**

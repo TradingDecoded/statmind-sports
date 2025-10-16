@@ -6,7 +6,7 @@ import Link from 'next/link';
 
 export default function Footer() {
   const [stats, setStats] = useState(null);
-  
+
   useEffect(() => {
     // Fetch homepage stats for footer
     const fetchStats = async () => {
@@ -21,14 +21,14 @@ export default function Footer() {
         console.error('Error loading footer stats:', err);
       }
     };
-    
+
     fetchStats();
   }, []);
-  
+
   // Default fallback
   const displayAccuracy = stats?.mainAccuracy || 76.1;
   const displayLabel = stats?.accuracyLabel || '2025 Season';
-  
+
   return (
     <footer className="bg-slate-900 border-t border-slate-800 mt-20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -51,7 +51,7 @@ export default function Footer() {
               <p className="text-slate-500 text-xs mt-1">{displayLabel}</p>
             </div>
           </div>
-          
+
           {/* Quick Links */}
           <div>
             <h3 className="text-white font-semibold mb-4">Quick Links</h3>
@@ -59,16 +59,17 @@ export default function Footer() {
               <li><Link href="/" className="text-slate-400 hover:text-emerald-400 transition-colors">Home</Link></li>
               <li><Link href="/predictions" className="text-slate-400 hover:text-emerald-400 transition-colors">Predictions</Link></li>
               <li><Link href="/results" className="text-slate-400 hover:text-emerald-400 transition-colors">Results</Link></li>
+              <li><Link href="/analytics" className="text-slate-400 hover:text-emerald-400 transition-colors">Analytics</Link></li>
               <li><Link href="/accuracy" className="text-slate-400 hover:text-emerald-400 transition-colors">Accuracy</Link></li>
               <li><Link href="/how-it-works" className="text-slate-400 hover:text-emerald-400 transition-colors">How It Works</Link></li>
             </ul>
           </div>
-          
+
           {/* Legal */}
           <div>
             <h3 className="text-white font-semibold mb-4">Information</h3>
             <p className="text-slate-400 text-sm mb-4">
-              Predictions are for informational and entertainment purposes only. 
+              Predictions are for informational and entertainment purposes only.
               Past performance does not guarantee future results.
             </p>
             <p className="text-slate-500 text-xs">
