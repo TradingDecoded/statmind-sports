@@ -7,17 +7,19 @@ import { useState } from 'react';
 export default function Navigation() {
   const pathname = usePathname();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  
+
   const links = [
     { href: '/', label: 'Home' },
     { href: '/predictions', label: 'Predictions' },
     { href: '/results', label: 'Results' },
     { href: '/analytics', label: 'Analytics' },
     { href: '/accuracy', label: 'Accuracy' },
+    { href: '/parlay-builder', label: 'Parlay Builder' },
+    { href: '/my-parlays', label: 'My Parlays' },
     { href: '/how-it-works', label: 'How It Works' },
     { href: '/about', label: 'About' },
   ];
-  
+
   return (
     <nav className="bg-gradient-to-r from-slate-900 to-slate-800 border-b border-slate-700 sticky top-0 z-50 backdrop-blur-sm bg-opacity-95">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -32,27 +34,26 @@ export default function Navigation() {
               <span className="text-emerald-400 text-xs leading-tight">Sports</span>
             </div>
           </Link>
-          
+
           {/* Desktop Navigation */}
           <div className="hidden md:flex space-x-1">
             {links.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
-                  pathname === link.href
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${pathname === link.href
                     ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/50'
                     : 'text-slate-300 hover:text-white hover:bg-slate-700'
-                }`}
+                  }`}
               >
                 {link.label}
               </Link>
             ))}
           </div>
-          
+
           {/* Mobile Menu Button */}
           <div className="md:hidden">
-            <button 
+            <button
               onClick={() => setIsMenuOpen(!isMenuOpen)}
               className="text-slate-300 hover:text-white p-2 focus:outline-none focus:ring-2 focus:ring-emerald-500 rounded-lg"
               aria-label="Toggle mobile menu"
@@ -71,7 +72,7 @@ export default function Navigation() {
             </button>
           </div>
         </div>
-        
+
         {/* Mobile Menu Dropdown */}
         {isMenuOpen && (
           <div className="md:hidden pb-4 border-t border-slate-700 mt-2">
@@ -81,11 +82,10 @@ export default function Navigation() {
                   key={link.href}
                   href={link.href}
                   onClick={() => setIsMenuOpen(false)}
-                  className={`px-4 py-3 rounded-lg text-base font-medium transition-all duration-200 ${
-                    pathname === link.href
+                  className={`px-4 py-3 rounded-lg text-base font-medium transition-all duration-200 ${pathname === link.href
                       ? 'bg-emerald-500 text-white'
                       : 'text-slate-300 hover:text-white hover:bg-slate-700'
-                  }`}
+                    }`}
                 >
                   {link.label}
                 </Link>

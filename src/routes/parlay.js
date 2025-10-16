@@ -17,25 +17,22 @@ const router = express.Router();
 router.get('/available-games', requireAuth, async (req, res) => {
   try {
     const { season, week } = req.query;
-    
-    if (!season || !week) {
-      return res.status(400).json({
-        success: false,
-        error: 'Season and week are required'
-      });
-    }
-    
+
+    // Use current season/week if not provided
+    const currentSeason = season ? parseInt(season) : 2025;
+    const currentWeek = week ? parseInt(week) : 7; // Default to week 7
+
     const games = await parlayService.getAvailableGames(
-      parseInt(season), 
-      parseInt(week)
+      currentSeason,
+      currentWeek
     );
-    
+
     res.json({
       success: true,
       games,
       count: games.length
     });
-    
+
   } catch (error) {
     console.error('Get available games error:', error);
     res.status(500).json({
@@ -53,21 +50,21 @@ router.get('/available-games', requireAuth, async (req, res) => {
 router.post('/calculate', requireAuth, async (req, res) => {
   try {
     const { games } = req.body;
-    
+
     if (!games || games.length === 0) {
       return res.status(400).json({
         success: false,
         error: 'Games array is required'
       });
     }
-    
+
     const calculation = parlayService.calculateParlayProbability(games);
-    
+
     res.json({
       success: true,
       ...calculation
     });
-    
+
   } catch (error) {
     console.error('Calculate probability error:', error);
     res.status(500).json({
@@ -108,14 +105,14 @@ router.post('/create',
           errors: errors.array()
         });
       }
-      
+
       const userId = req.user.id;
       const parlayData = req.body;
-      
+
       const result = await parlayService.createParlay(userId, parlayData);
-      
+
       res.status(201).json(result);
-      
+
     } catch (error) {
       console.error('Create parlay route error:', error);
       res.status(400).json({
@@ -134,18 +131,18 @@ router.get('/mine', requireAuth, async (req, res) => {
   try {
     const userId = req.user.id;
     const { season, status } = req.query;
-    
+
     const parlays = await parlayService.getUserParlays(userId, {
       season: season ? parseInt(season) : null,
       status
     });
-    
+
     res.json({
       success: true,
       parlays,
       count: parlays.length
     });
-    
+
   } catch (error) {
     console.error('Get user parlays error:', error);
     res.status(500).json({
@@ -163,14 +160,14 @@ router.get('/:id', requireAuth, async (req, res) => {
   try {
     const parlayId = parseInt(req.params.id);
     const userId = req.user.id;
-    
+
     const parlay = await parlayService.getParlayById(parlayId, userId);
-    
+
     res.json({
       success: true,
       parlay
     });
-    
+
   } catch (error) {
     console.error('Get parlay error:', error);
     res.status(404).json({
@@ -188,11 +185,11 @@ router.delete('/:id', requireAuth, async (req, res) => {
   try {
     const parlayId = parseInt(req.params.id);
     const userId = req.user.id;
-    
+
     const result = await parlayService.deleteParlay(parlayId, userId);
-    
+
     res.json(result);
-    
+
   } catch (error) {
     console.error('Delete parlay error:', error);
     res.status(400).json({
