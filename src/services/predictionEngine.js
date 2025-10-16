@@ -198,13 +198,23 @@ class PredictionEngine {
   }
 
   /**
- * Determine confidence level based on win probability
- * RECALIBRATED: Stricter thresholds for better accuracy correlation
+ * Determine confidence level based on season-specific methodology
+ * 2024 and earlier: Score differential method (>15 = High, >8 = Medium)
+ * 2025+: Win probability method (70%+ = High, 60%+ = Medium)
  */
-  determineConfidence(probability) {
-    if (probability >= 0.70) return 'High';    // 70%+ = High Confidence
-    if (probability >= 0.60) return 'Medium';  // 60-69% = Medium Confidence
-    return 'Low';                               // <60% = Low Confidence
+  determineConfidence(probability, totalScore = null, season = null) {
+    // For 2024 and earlier: Use score differential with calibrated thresholds
+    if (season && season <= 2024 && totalScore !== null) {
+      const scoreDiff = Math.abs(totalScore);
+      if (scoreDiff > 15) return 'High';
+      if (scoreDiff > 8) return 'Medium';
+      return 'Low';
+    }
+
+    // For 2025+: Use win probability method with strict thresholds
+    if (probability >= 0.70) return 'High';
+    if (probability >= 0.60) return 'Medium';
+    return 'Low';
   }
 
   /**
@@ -454,7 +464,7 @@ class PredictionEngine {
       // Determine predicted winner and confidence
       const predictedWinner = homeWinProb > 0.5 ? home_team : away_team;
       const winnerProb = Math.max(homeWinProb, awayWinProb);
-      const confidence = this.determineConfidence(winnerProb);
+      const confidence = this.determineConfidence(winnerProb, totalScore, game.season);
 
       // Build prediction data object WITH injury context
       const predictionData = {
