@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
-export default function MyParlays() {
+export default function MyParlaysPage() {
   const router = useRouter();
   const [parlays, setParlays] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -22,21 +22,25 @@ export default function MyParlays() {
   }, []);
 
   const fetchMyParlays = async () => {
+    setLoading(true);
     try {
       const token = localStorage.getItem('authToken');
-      const response = await fetch('http://localhost:4000/api/parlay/mine', {
+      const response = await fetch(`http://localhost:4000/api/parlay/mine?t=${Date.now()}`, {
         headers: {
-          'Authorization': `Bearer ${token}`
-        }
+          'Authorization': `Bearer ${token}`,
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache'
+        },
+        cache: 'no-store'
       });
 
-      if (!response.ok) throw new Error('Failed to fetch parlays');
+      if (!response.ok) throw new Error('Failed to fetch');
 
       const data = await response.json();
       setParlays(data.parlays || []);
-      setLoading(false);
     } catch (err) {
-      console.error('Fetch error:', err);
+      setError('Failed to load parlays');
+    } finally {
       setLoading(false);
     }
   };
@@ -73,10 +77,20 @@ export default function MyParlays() {
 
       if (!response.ok) throw new Error('Failed to delete');
 
-      fetchMyParlays();
+      // Optimistically remove from state
+      setParlays(prevParlays => prevParlays.filter(p => p.id !== parlayId));
+
+      // Force Next.js to refresh
+      router.refresh();
+
+      // Also fetch fresh data
+      await fetchMyParlays();
+
       alert('Parlay deleted successfully');
     } catch (err) {
+      console.error('Delete error:', err);
       alert('Failed to delete parlay');
+      fetchMyParlays();
     }
   };
 
@@ -110,7 +124,7 @@ export default function MyParlays() {
   return (
     <div className="min-h-screen bg-slate-950 py-8">
       <div className="max-w-6xl mx-auto px-4">
-        
+
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div>
@@ -161,11 +175,10 @@ export default function MyParlays() {
             <button
               key={status}
               onClick={() => setFilter(status)}
-              className={`px-4 py-2 rounded-lg font-semibold transition-all ${
-                filter === status
-                  ? 'bg-emerald-600 text-white'
-                  : 'bg-slate-900 border border-slate-800 text-slate-300 hover:bg-slate-800'
-              }`}
+              className={`px-4 py-2 rounded-lg font-semibold transition-all ${filter === status
+                ? 'bg-emerald-600 text-white'
+                : 'bg-slate-900 border border-slate-800 text-slate-300 hover:bg-slate-800'
+                }`}
             >
               {status.charAt(0).toUpperCase() + status.slice(1)}
             </button>
@@ -258,9 +271,8 @@ export default function MyParlays() {
                         </span>
                       </div>
                       {game.result && (
-                        <span className={`text-sm font-semibold ${
-                          game.result === 'correct' ? 'text-emerald-400' : 'text-red-400'
-                        }`}>
+                        <span className={`text-sm font-semibold ${game.result === 'correct' ? 'text-emerald-400' : 'text-red-400'
+                          }`}>
                           {game.result === 'correct' ? '✓ Correct' : '✗ Wrong'}
                         </span>
                       )}

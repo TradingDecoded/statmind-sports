@@ -147,6 +147,23 @@ export default function ParlayBuilder() {
     setSaving(true);
     try {
       const token = localStorage.getItem('authToken');
+
+      // Add win_probability to each game pick
+      const gamesWithProb = selectedPicks.map(pick => {
+        // Find the game data to get probabilities
+        const gameData = availableGames.find(g => g.id === pick.game_id);
+
+        // Get the probability for the team the user picked
+        const winProb = pick.picked_winner === gameData.home_team
+          ? gameData.home_win_probability
+          : gameData.away_win_probability;
+
+        return {
+          ...pick,
+          win_probability: winProb * 100 // Convert to percentage
+        };
+      });
+
       const response = await fetch('http://localhost:4000/api/parlay/create', {
         method: 'POST',
         headers: {
@@ -157,16 +174,20 @@ export default function ParlayBuilder() {
           parlayName: parlayName,
           season: 2025,
           week: currentWeek,
-          games: selectedPicks
+          games: gamesWithProb
         })
       });
 
       if (!response.ok) throw new Error('Failed to save parlay');
 
       alert(`✅ Parlay "${parlayName}" saved successfully!`);
-      router.push('/my-parlays');
+
+      // Force full page reload to my-parlays
+      window.location.href = '/my-parlays';
+
     } catch (err) {
       alert('Failed to save parlay. Please try again.');
+      console.error('Save error:', err);
     } finally {
       setSaving(false);
     }

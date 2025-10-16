@@ -56,10 +56,34 @@ class ParlayService {
   // ==========================================
   calculateParlayProbability(games) {
     try {
+      // Validate input
+      if (!games || games.length === 0) {
+        return {
+          combinedProbability: 0,
+          riskLevel: 'Unknown',
+          individualProbabilities: [],
+          legCount: 0
+        };
+      }
+
       // Get individual probabilities
       const probabilities = games.map(game => {
-        // Convert win probability to decimal (e.g., 65.5 becomes 0.655)
-        return game.win_probability / 100;
+        // Ensure win_probability exists and is a number
+        let prob = parseFloat(game.win_probability);
+
+        // If it's already a decimal (0-1), use as-is
+        // If it's a percentage (1-100), convert to decimal
+        if (prob > 1) {
+          prob = prob / 100;
+        }
+
+        // Ensure it's a valid number between 0 and 1
+        if (isNaN(prob) || prob < 0 || prob > 1) {
+          console.error('Invalid probability:', game.win_probability);
+          prob = 0.5; // Default to 50% if invalid
+        }
+
+        return prob;
       });
 
       // Calculate combined probability (multiply all together)
@@ -68,25 +92,33 @@ class ParlayService {
         1
       );
 
+      // Ensure result is valid
+      const finalProb = isNaN(combinedProbability) ? 0 : combinedProbability;
+
       // Determine risk level
       let riskLevel;
-      if (combinedProbability >= 0.5) {
+      if (finalProb >= 0.5) {
         riskLevel = 'Low';
-      } else if (combinedProbability >= 0.3) {
+      } else if (finalProb >= 0.3) {
         riskLevel = 'Medium';
       } else {
         riskLevel = 'High';
       }
 
       return {
-        combinedProbability: (combinedProbability * 100).toFixed(1), // Convert back to percentage
+        combinedProbability: (finalProb * 100).toFixed(1), // Convert to percentage
         riskLevel,
         individualProbabilities: probabilities.map(p => (p * 100).toFixed(1)),
         legCount: games.length
       };
     } catch (error) {
       console.error('Calculate probability error:', error);
-      throw error;
+      return {
+        combinedProbability: 0,
+        riskLevel: 'Unknown',
+        individualProbabilities: [],
+        legCount: games.length
+      };
     }
   }
 

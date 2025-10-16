@@ -51,6 +51,8 @@ router.post('/calculate', requireAuth, async (req, res) => {
   try {
     const { games } = req.body;
 
+    console.log('📊 Calculating parlay for games:', JSON.stringify(games, null, 2));
+
     if (!games || games.length === 0) {
       return res.status(400).json({
         success: false,
@@ -59,6 +61,8 @@ router.post('/calculate', requireAuth, async (req, res) => {
     }
 
     const calculation = parlayService.calculateParlayProbability(games);
+
+    console.log('✅ Calculation result:', calculation);
 
     res.json({
       success: true,
