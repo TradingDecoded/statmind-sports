@@ -9,27 +9,112 @@ import StatsCard from '@/components/StatsCard';
 
 export default function HomePage() {
   const [predictions, setPredictions] = useState([]);
+  const [homepageStats, setHomepageStats] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [statsLoading, setStatsLoading] = useState(true);
   const [error, setError] = useState(null);
-  
+
   useEffect(() => {
     loadPredictions();
+    loadHomepageStats();
   }, []);
-  
+
   const loadPredictions = async () => {
     try {
       setLoading(true);
       setError(null);
-      const data = await fetchUpcomingPredictions(6);
-      setPredictions(data);
+
+      // Fetch ALL upcoming predictions
+      const data = await fetchUpcomingPredictions(50);
+
+      console.log('📊 Total predictions fetched:', data.length);
+
+      if (data.length === 0) {
+        console.log('❌ No predictions available at all');
+        setPredictions([]);
+        return;
+      }
+
+      // Log first few predictions to see structure
+      console.log('📋 Sample predictions:', data.slice(0, 3).map(p => ({
+        week: p.week,
+        season: p.season,
+        confidence: p.confidence,
+        gameId: p.gameId
+      })));
+
+      // Get the EARLIEST upcoming week available in the data
+      const upcomingWeeks = data.map(p => p.week).filter(w => w);
+      const nextWeek = Math.min(...upcomingWeeks);
+      const season = 2025;
+
+      console.log(`📅 Next upcoming week in data: Week ${nextWeek}`);
+
+      // Filter for next upcoming week and HIGH confidence
+      const nextWeekHighConfidence = data.filter(pred => {
+        const isNextWeek = pred.week === nextWeek;
+        const isHighConfidence = pred.confidence && pred.confidence.toLowerCase() === 'high';
+        return isNextWeek && isHighConfidence;
+      });
+
+      // Get ALL games from next week for breakdown
+      const nextWeekGames = data.filter(p => p.week === nextWeek);
+
+      console.log('🎯 Confidence breakdown for Week', nextWeek, ':', {
+        total: nextWeekGames.length,
+        high: nextWeekGames.filter(p => p.confidence?.toLowerCase() === 'high').length,
+        medium: nextWeekGames.filter(p => p.confidence?.toLowerCase() === 'medium').length,
+        low: nextWeekGames.filter(p => p.confidence?.toLowerCase() === 'low').length
+      });
+
+      console.log('✅ High confidence games found:', nextWeekHighConfidence.length);
+
+      // Show high confidence games, or all games if no high confidence
+      if (nextWeekHighConfidence.length === 0) {
+        console.log('⚠️ No high confidence games, showing all games from Week', nextWeek);
+        setPredictions(nextWeekGames);
+      } else {
+        setPredictions(nextWeekHighConfidence);
+      }
     } catch (err) {
-      console.error('Error loading predictions:', err);
+      console.error('❌ Error loading predictions:', err);
       setError('Failed to load predictions. Please try again later.');
     } finally {
       setLoading(false);
     }
   };
-  
+
+  const loadHomepageStats = async () => {
+    try {
+      setStatsLoading(true);
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://statmindsports.com/api';
+      const response = await fetch(`${apiUrl}/stats/homepage`);
+      const data = await response.json();
+
+      if (data.success) {
+        setHomepageStats(data.stats);
+        console.log('✅ Homepage stats loaded:', data.stats);
+      }
+    } catch (err) {
+      console.error('❌ Error loading homepage stats:', err);
+      // Keep default stats if API fails
+    } finally {
+      setStatsLoading(false);
+    }
+  };
+
+  // Default fallback stats (used if API fails)
+  const displayStats = homepageStats || {
+    mainAccuracy: 79.7,
+    accuracyLabel: "Proven Accuracy",
+    firstSeason: 2024,
+    provenSinceText: "Proven Accuracy Since 2024",
+    gamesPredicted: 256,
+    gamesPredictedText: "256+ Games Predicted",
+    seasonsTracked: 2,
+    seasonsTrackedText: "2+ Seasons Tracked"
+  };
+
   return (
     <div className="min-h-screen">
       {/* Hero Section */}
@@ -37,151 +122,122 @@ export default function HomePage() {
         <div className="absolute inset-0 bg-grid-white/[0.02] bg-[size:50px_50px]"></div>
         <div className="max-w-7xl mx-auto relative">
           <div className="text-center mb-12">
-            <div className="inline-block mb-6">
-              <span className="px-4 py-2 bg-emerald-500/10 border border-emerald-500/30 rounded-full text-emerald-400 text-sm font-semibold">
-                Proven Accuracy Since 2024
-              </span>
+            {/* Big Bold Year Badge */}
+            <div className="mb-8">
+              <h2 className="text-6xl md:text-8xl font-black bg-gradient-to-r from-emerald-400 to-teal-400 bg-clip-text text-transparent">
+                2025
+              </h2>
             </div>
+
             <h1 className="text-5xl md:text-7xl font-bold mb-6 bg-gradient-to-r from-white to-emerald-400 bg-clip-text text-transparent">
               NFL Predictions with
               <br />
-              <span className="text-emerald-400">79.7% Accuracy</span>
+              <span className="text-emerald-400">{displayStats.mainAccuracy}% Accuracy</span>
             </h1>
             <p className="text-xl text-slate-300 max-w-2xl mx-auto mb-8">
               Advanced data science meets NFL analytics. Get reliable game predictions powered by our proven 5-component algorithm.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link 
+              <Link
                 href="/predictions"
-                className="inline-flex items-center px-8 py-4 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg font-semibold transition-all duration-200 shadow-lg shadow-emerald-500/50"
+                className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 px-8 rounded-lg transition"
               >
-                View All Predictions
-                <svg className="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                </svg>
+                View This Week's Picks
               </Link>
-              <Link 
+              <Link
                 href="/accuracy"
-                className="inline-flex items-center px-8 py-4 bg-slate-800 hover:bg-slate-700 text-white rounded-lg font-semibold transition-all duration-200 border border-slate-600"
+                className="bg-slate-700 hover:bg-slate-600 text-white font-bold py-3 px-8 rounded-lg transition"
               >
                 See Our Track Record
               </Link>
             </div>
           </div>
-          
+
+          {/* Stats Grid - First card now shows OVERALL accuracy */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
             <StatsCard
-              title="Proven Accuracy"
-              value="79.7%"
-              subtitle="2024 Season"
-              icon="🎯"
+              title="Overall Accuracy"
+              value={displayStats.overallAccuracy ? `${displayStats.overallAccuracy}%` : "88.6%"}
+              subtitle={displayStats.overallVerifiedGames ? `${displayStats.overallVerifiedGames.toLocaleString()} verified games` : "1,431 verified games"}
+              highlight
             />
             <StatsCard
-              title="Games Predicted"
-              value="256+"
-              subtitle="Total Predictions"
-              icon="📊"
+              title="Total Predictions"
+              value={displayStats.gamesPredicted ? displayStats.gamesPredicted.toLocaleString() : "1,615"}
+              subtitle="Across all seasons"
             />
             <StatsCard
               title="Seasons Tracked"
-              value="2+"
-              subtitle="Historical Data"
-              icon="📅"
+              value={displayStats.seasonsTracked}
+              subtitle={`Since ${displayStats.firstSeason}`}
             />
           </div>
         </div>
       </section>
-      
+
       {/* This Week's Predictions */}
-      <section className="py-16 px-4">
+      <section className="py-16 px-4 bg-slate-950">
         <div className="max-w-7xl mx-auto">
-          <div className="flex items-center justify-between mb-8">
-            <h2 className="text-3xl md:text-4xl font-bold">This Week's Predictions</h2>
-            <Link 
-              href="/predictions"
-              className="text-emerald-400 hover:text-emerald-300 font-semibold transition-colors"
-            >
-              View All →
-            </Link>
+          <div className="text-center mb-12">
+            <h2 className="text-4xl font-bold mb-4">This Week's Top Picks</h2>
+            <p className="text-slate-400 text-lg">
+              Our <span className="text-emerald-400 font-semibold">high confidence</span> predictions for the upcoming games
+            </p>
           </div>
-          
-          {/* Loading State */}
-          {loading && (
-            <div className="flex flex-col items-center justify-center py-20">
-              <div className="relative">
-                <div className="w-16 h-16 border-4 border-blue-200 border-t-emerald-500 rounded-full animate-spin"></div>
-              </div>
-              <p className="mt-6 text-slate-400 text-lg">Loading predictions...</p>
+
+          {loading ? (
+            <div className="text-center py-12">
+              <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500"></div>
+              <p className="mt-4 text-slate-400">Loading predictions...</p>
             </div>
-          )}
-          
-          {/* Error State */}
-          {error && !loading && (
-            <div className="flex flex-col items-center justify-center py-20 px-4">
-              <div className="text-6xl mb-6">⚠️</div>
-              <h3 className="text-2xl font-bold text-white mb-3">Something went wrong</h3>
-              <p className="text-slate-400 text-center max-w-md mb-6">{error}</p>
+          ) : error ? (
+            <div className="text-center py-12">
+              <p className="text-red-400 mb-4">{error}</p>
               <button
                 onClick={loadPredictions}
-                className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 px-6 rounded-lg transition"
+                className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-2 px-6 rounded-lg transition"
               >
                 Try Again
               </button>
             </div>
-          )}
-          
-          {/* Empty State */}
-          {!loading && !error && predictions.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-20 px-4">
-              <div className="text-6xl mb-6">🔮</div>
-              <h3 className="text-2xl font-bold text-white mb-3">No predictions available</h3>
-              <p className="text-slate-400 text-center max-w-md">
-                New predictions are generated every Tuesday. Check back soon for the latest NFL game predictions!
-              </p>
+          ) : predictions.length === 0 ? (
+            <div className="text-center py-12">
+              <p className="text-slate-400 text-lg mb-4">No predictions available yet.</p>
+              <p className="text-slate-500">Check back soon for this week's picks!</p>
             </div>
-          )}
-          
-          {/* Success State - Show Predictions */}
-          {!loading && !error && predictions.length > 0 && (
+          ) : (
             <>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-                {predictions.map((prediction, idx) => (
-                  <PredictionCard key={idx} prediction={prediction} />
+                {predictions.map((prediction) => (
+                  <PredictionCard key={prediction.gameId} prediction={prediction} />
                 ))}
               </div>
               <div className="text-center">
-                <Link 
+                <Link
                   href="/predictions"
-                  className="inline-flex items-center px-6 py-3 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-lg font-semibold transition-all duration-200"
+                  className="inline-block bg-slate-800 hover:bg-slate-700 text-white font-bold py-3 px-8 rounded-lg transition"
                 >
-                  View All Predictions
-                  <svg className="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
-                  </svg>
+                  View All Predictions →
                 </Link>
               </div>
             </>
           )}
         </div>
       </section>
-      
-      {/* CTA Section */}
-      <section className="py-20 px-4 bg-gradient-to-r from-emerald-900/20 to-teal-900/20 border-y border-emerald-500/20">
+
+      {/* How It Works Preview */}
+      <section className="py-16 px-4 bg-gradient-to-b from-slate-950 to-slate-900">
         <div className="max-w-4xl mx-auto text-center">
-          <h2 className="text-4xl font-bold mb-4">
-            Want to understand our methodology?
-          </h2>
-          <p className="text-slate-300 text-lg mb-8">
-            Learn how we achieve 79.7% accuracy using advanced data science and a proven 5-component algorithm.
+          <h2 className="text-4xl font-bold mb-6">Data-Driven Predictions</h2>
+          <p className="text-xl text-slate-300 mb-8">
+            Our 5-component algorithm analyzes Elo ratings, team rest, weather conditions,
+            home advantage, and strength of schedule to deliver consistently accurate predictions.
           </p>
-          <Link 
+          <Link
             href="/how-it-works"
-            className="inline-flex items-center px-8 py-4 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg font-semibold transition-all duration-200 shadow-lg shadow-emerald-500/50"
+            className="inline-block bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 px-8 rounded-lg transition"
           >
-            Explore Our Algorithm
-            <svg className="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
+            Learn How It Works
           </Link>
         </div>
       </section>

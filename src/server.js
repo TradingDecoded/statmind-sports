@@ -12,6 +12,7 @@ import dotenv from "dotenv";
 import winston from "winston";
 import compression from "compression";
 import predictionsRouter from "./routes/predictions.js";
+import statsRoutes from "./routes/stats.js";
 import "./services/predictionScheduler.js";
 import adminRouter from "./routes/admin.js";
 
@@ -126,6 +127,7 @@ app.get("/", (req, res) => {
 // Predictions Route
 // ======================================
 app.use("/api/predictions", predictionsRouter);
+app.use("/api/stats", statsRoutes);
 app.use("/api/admin", adminRouter);
 
 // ======================================
