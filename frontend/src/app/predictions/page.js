@@ -106,8 +106,17 @@ export default function PredictionsPage() {
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-2">Week</label>
               <select value={week} onChange={(e) => setWeek(Number(e.target.value))} className="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all cursor-pointer">
-                {[...Array(18)].map((_, i) => (
-                  <option key={i + 1} value={i + 1}>Week {i + 1}</option>
+                {[...Array(22)].map((_, i) => (
+                  <option key={i + 1} value={i + 1}>
+                    {i + 1 <= 18
+                      ? `Week ${i + 1}`
+                      : i + 1 === 19 ? 'Wild Card Round'
+                        : i + 1 === 20 ? 'Divisional Round'
+                          : i + 1 === 21 ? 'Conference Championships'
+                            : i + 1 === 22 ? 'Super Bowl'
+                              : `Week ${i + 1}`
+                    }
+                  </option>
                 ))}
               </select>
             </div>

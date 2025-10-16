@@ -4,23 +4,23 @@ import pool from '../config/database.js';
 const ESPN_BASE_URL = 'https://site.api.espn.com/apis/site/v2/sports/football/nfl';
 
 class ESPNDataService {
-  
+
   /**
    * Fetch and store all NFL teams
    */
   async fetchAndStoreTeams() {
     try {
       console.log('📥 Fetching NFL teams from ESPN...');
-      
+
       const response = await fetch(`${ESPN_BASE_URL}/teams`);
       const data = await response.json();
-      
+
       const teams = data.sports[0].leagues[0].teams;
       let stored = 0;
-      
+
       for (const teamWrapper of teams) {
         const team = teamWrapper.team;
-        
+
         const query = `
           INSERT INTO teams (team_id, key, name, city, conference, division)
           VALUES ($1, $2, $3, $4, $5, $6)
@@ -32,7 +32,7 @@ class ESPNDataService {
             conference = EXCLUDED.conference,
             division = EXCLUDED.division
         `;
-        
+
         const values = [
           team.id,
           team.abbreviation,
@@ -41,11 +41,11 @@ class ESPNDataService {
           team.groups?.name || null,
           team.groups?.parent?.name || null
         ];
-        
+
         await pool.query(query, values);
         stored++;
       }
-      
+
       console.log(`✅ Stored ${stored} NFL teams`);
       return stored;
     } catch (error) {
@@ -57,23 +57,25 @@ class ESPNDataService {
   /**
    * Fetch season schedule for a specific week
    */
-  async fetchSeasonSchedule(year, week) {
+  async fetchSeasonSchedule(season, week) {
     try {
-      console.log(`📅 Fetching schedule for ${year} Week ${week}...`);
-      
+      const year = season;
+      const seasonType = week <= 18 ? 2 : 3; // Regular season (2) or Playoffs (3)
+      const espnWeek = week <= 18 ? week : week - 18; // Playoffs use weeks 1-4
+
       const response = await fetch(
-        `${ESPN_BASE_URL}/scoreboard?dates=${year}&seasontype=2&week=${week}`
+        `${ESPN_BASE_URL}/scoreboard?dates=${year}&seasontype=${seasonType}&week=${espnWeek}`
       );
       const data = await response.json();
-      
+
       const events = data.events || [];
       let stored = 0;
-      
+
       for (const event of events) {
         const competition = event.competitions[0];
         const homeTeam = competition.competitors.find(c => c.homeAway === 'home');
         const awayTeam = competition.competitors.find(c => c.homeAway === 'away');
-        
+
         const query = `
           INSERT INTO games (
             game_id, season, week, game_date,
@@ -85,7 +87,7 @@ class ESPNDataService {
             home_score = EXCLUDED.home_score,
             away_score = EXCLUDED.away_score
         `;
-        
+
         const values = [
           event.id,
           year,
@@ -96,11 +98,11 @@ class ESPNDataService {
           competition.status.type.completed ? parseInt(homeTeam.score) : null,
           competition.status.type.completed ? parseInt(awayTeam.score) : null
         ];
-        
+
         await pool.query(query, values);
         stored++;
       }
-      
+
       console.log(`✅ Stored ${stored} games for Week ${week}`);
       return stored;
     } catch (error) {
@@ -110,41 +112,45 @@ class ESPNDataService {
   }
 
   /**
-   * Update scores for completed games
-   */
-  async updateGameScores(year, week) {
+ * Update scores for completed games
+ */
+  async updateGameScores(season, week) {
     try {
-      console.log(`🔄 Updating scores for ${year} Week ${week}...`);
-      
+      console.log(`🔄 Updating scores for ${season} Week ${week}...`);
+
+      const year = season;
+      const seasonType = week <= 18 ? 2 : 3; // Regular season (2) or Playoffs (3)
+      const espnWeek = week <= 18 ? week : week - 18; // Playoffs use weeks 1-4
+
       const response = await fetch(
-        `${ESPN_BASE_URL}/scoreboard?dates=${year}&seasontype=2&week=${week}`
+        `${ESPN_BASE_URL}/scoreboard?dates=${year}&seasontype=${seasonType}&week=${espnWeek}`
       );
       const data = await response.json();
-      
+
       const events = data.events || [];
       let updated = 0;
-      
+
       for (const event of events) {
         const competition = event.competitions[0];
-        
+
         // Only update if game is completed
         if (competition.status.type.completed) {
           const homeTeam = competition.competitors.find(c => c.homeAway === 'home');
           const awayTeam = competition.competitors.find(c => c.homeAway === 'away');
-          
+
           const query = `
-            UPDATE games 
-            SET home_score = $1, away_score = $2
-            WHERE game_id = $3 AND home_score IS NULL
-            RETURNING game_id
-          `;
-          
+          UPDATE games 
+          SET home_score = $1, away_score = $2
+          WHERE game_id = $3 AND home_score IS NULL
+          RETURNING game_id
+        `;
+
           const values = [
             parseInt(homeTeam.score),
             parseInt(awayTeam.score),
             event.id
           ];
-          
+
           const result = await pool.query(query, values);
           if (result.rows.length > 0) {
             updated++;
@@ -152,7 +158,7 @@ class ESPNDataService {
           }
         }
       }
-      
+
       console.log(`✅ Updated ${updated} game scores`);
       return updated;
     } catch (error) {
@@ -167,16 +173,16 @@ class ESPNDataService {
   async updateTeamStatistics(season) {
     try {
       console.log(`📊 Updating team statistics for ${season} season...`);
-      
+
       // Get all teams
       const teamsResult = await pool.query('SELECT key FROM teams');
       const teams = teamsResult.rows;
-      
+
       let updated = 0;
-      
+
       for (const team of teams) {
         const teamKey = team.key;
-        
+
         // Calculate statistics from completed games
         const statsQuery = `
           WITH team_games AS (
@@ -205,28 +211,28 @@ class ESPNDataService {
             AVG(opp_score) as avg_points_against
           FROM team_games
         `;
-        
+
         const statsResult = await pool.query(statsQuery, [teamKey, season]);
         const stats = statsResult.rows[0];
-        
+
         if (parseInt(stats.total_games) === 0) {
           continue; // Skip teams with no games played
         }
-        
+
         // Calculate ratings (simple version - can be enhanced)
         const offensiveRating = Math.min(100, (parseFloat(stats.avg_points_for) / 35) * 100);
         const defensiveRating = Math.max(0, 100 - ((parseFloat(stats.avg_points_against) / 35) * 100));
-        
+
         // Get current Elo or initialize to 1500
         const eloQuery = `
           SELECT elo_rating FROM team_statistics 
           WHERE team_key = $1
         `;
         const eloResult = await pool.query(eloQuery, [teamKey]);
-        const currentElo = eloResult.rows.length > 0 
-          ? parseFloat(eloResult.rows[0].elo_rating) 
+        const currentElo = eloResult.rows.length > 0
+          ? parseFloat(eloResult.rows[0].elo_rating)
           : 1500;
-        
+
         // Update team statistics
         const updateQuery = `
           INSERT INTO team_statistics (
@@ -250,7 +256,7 @@ class ESPNDataService {
             elo_rating = EXCLUDED.elo_rating,
             last_updated = CURRENT_TIMESTAMP
         `;
-        
+
         const updateValues = [
           teamKey,
           parseInt(stats.wins),
@@ -266,11 +272,11 @@ class ESPNDataService {
           defensiveRating,
           currentElo
         ];
-        
+
         await pool.query(updateQuery, updateValues);
         updated++;
       }
-      
+
       console.log(`✅ Updated statistics for ${updated} teams`);
       return updated;
     } catch (error) {
@@ -285,15 +291,15 @@ class ESPNDataService {
   async fetchFullSeason(year, startWeek = 1, endWeek = 18) {
     try {
       console.log(`📥 Fetching full season ${year} (weeks ${startWeek}-${endWeek})...`);
-      
+
       for (let week = startWeek; week <= endWeek; week++) {
         await this.fetchSeasonSchedule(year, week);
         await this.updateGameScores(year, week);
       }
-      
+
       // Update statistics after fetching all weeks
       await this.updateTeamStatistics(year);
-      
+
       console.log(`✅ Full season ${year} loaded successfully`);
     } catch (error) {
       console.error('Error fetching full season:', error);
