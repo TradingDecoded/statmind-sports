@@ -6,7 +6,7 @@ import { useAuth } from '../../contexts/AuthContext';
 export default function ParlayBuilderPage() {
   const router = useRouter();
   const { user } = useAuth();
-  
+
   const [availableGames, setAvailableGames] = useState([]);
   const [selectedPicks, setSelectedPicks] = useState([]);
   const [parlayName, setParlayName] = useState('');
@@ -40,7 +40,7 @@ export default function ParlayBuilderPage() {
       'Dallas Cowboys': 'DAL',
       'New York Giants': 'NYG',
       'Philadelphia Eagles': 'PHI',
-      'Washington Commanders': 'WSH',
+      'Washington Commanders': 'WAS',
       'Chicago Bears': 'CHI',
       'Detroit Lions': 'DET',
       'Green Bay Packers': 'GB',
@@ -70,7 +70,7 @@ export default function ParlayBuilderPage() {
   const fetchAvailableGames = async () => {
     try {
       const token = localStorage.getItem('authToken');
-      
+
       const response = await fetch('/api/parlay/available-games', {
         headers: {
           'Authorization': `Bearer ${token}`
@@ -165,6 +165,9 @@ export default function ParlayBuilderPage() {
       }
 
       const data = await response.json();
+      console.log('🔍 Probability response:', data);
+      console.log('🔍 combinedProbability value:', data.combinedProbability);
+      console.log('🔍 Type:', typeof data.combinedProbability);
       setCalculatedProb(data);
       setCalculating(false);
     } catch (err) {
@@ -188,6 +191,29 @@ export default function ParlayBuilderPage() {
     try {
       const token = localStorage.getItem('authToken');
 
+      // Enrich selectedPicks with complete game data
+      const completeGamesData = selectedPicks.map(pick => {
+        const gameData = availableGames.find(g => g.id === pick.game_id);
+
+        return {
+          game_id: pick.game_id,
+          home_team: gameData.home_team,
+          away_team: gameData.away_team,
+          picked_winner: pick.picked_winner,
+          ai_winner: gameData.predicted_winner,
+          ai_probability: pick.picked_winner === gameData.home_team
+            ? gameData.home_win_probability
+            : gameData.away_win_probability
+        };
+      });
+
+      console.log('💾 Saving parlay with data:', {
+        parlayName,
+        season: currentSeason,
+        week: currentWeek,
+        games: completeGamesData
+      });
+
       const response = await fetch('/api/parlay/create', {
         method: 'POST',
         headers: {
@@ -195,15 +221,19 @@ export default function ParlayBuilderPage() {
           'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
-          parlay_name: parlayName,
+          parlayName: parlayName,
           season: currentSeason,
           week: currentWeek,
-          games: selectedPicks
+          games: completeGamesData
         })
       });
 
+      const responseData = await response.json();
+      console.log('💾 Response:', responseData);
+
       if (!response.ok) {
-        throw new Error('Failed to save parlay');
+        console.error('❌ Save failed:', responseData);
+        throw new Error(responseData.error || 'Failed to save parlay');
       }
 
       alert('Parlay saved successfully! 🎉');
@@ -244,10 +274,10 @@ export default function ParlayBuilderPage() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
 
           {/* Left Column: Available Games */}
-          <div className="lg:col-span-2">
+          <div className="lg:col-span-3">
             <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
               <h2 className="text-2xl font-bold text-white mb-6">
                 Available Games ({availableGames.length})
@@ -256,148 +286,161 @@ export default function ParlayBuilderPage() {
               {availableGames.length === 0 ? (
                 <p className="text-slate-400">No games available for this week yet.</p>
               ) : (
-                <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {availableGames.map((game) => {
                     const selectedPick = selectedPicks.find(p => p.game_id === game.id);
                     const isSelected = !!selectedPick;
                     const awayRecord = game.away_wins !== null ? `${game.away_wins}-${game.away_losses}` : '';
                     const homeRecord = game.home_wins !== null ? `${game.home_wins}-${game.home_losses}` : '';
 
+                    // Calculate probabilities
+                    const awayProb = parseFloat(game.away_win_probability) || 0;
+                    const homeProb = parseFloat(game.home_win_probability) || 0;
+
                     return (
                       <div
                         key={game.id}
-                        className={`bg-slate-800 rounded-xl p-5 border-2 transition-all ${
-                          isSelected 
-                            ? 'border-emerald-500 shadow-lg shadow-emerald-500/20' 
-                            : 'border-slate-700 hover:border-slate-600'
-                        }`}
+                        className={`bg-slate-800/50 rounded-lg overflow-hidden border-2 transition-all ${isSelected
+                          ? 'border-emerald-500 shadow-lg shadow-emerald-500/30'
+                          : 'border-slate-700/50'
+                          }`}
                       >
-                        {/* Game Header */}
-                        <div className="flex items-center justify-between mb-4">
-                          <div className="text-xs text-slate-400 font-semibold uppercase">
-                            Week {game.week}
+                        {/* Header - Date */}
+                        <div className="bg-slate-800/80 px-3 py-1.5 border-b border-slate-700/50">
+                          <div className="text-xs text-slate-300 font-medium">
+                            {new Date(game.game_date).toLocaleDateString('en-US', {
+                              weekday: 'short',
+                              month: 'short',
+                              day: 'numeric'
+                            })}
                           </div>
-                          {game.confidence_level && (
-                            <div className={`px-3 py-1 rounded-full text-xs font-bold ${
-                              game.confidence_level === 'HC' 
-                                ? 'bg-emerald-500/20 text-emerald-400' 
-                                : game.confidence_level === 'MC'
-                                ? 'bg-yellow-500/20 text-yellow-400'
-                                : 'bg-slate-500/20 text-slate-400'
-                            }`}>
-                              {game.confidence_level} Pick
-                            </div>
-                          )}
                         </div>
 
-                        {/* Teams Grid */}
-                        <div className="grid grid-cols-2 gap-4">
-                          
-                          {/* Away Team */}
+                        {/* Teams Container */}
+                        <div className="p-3 flex items-center justify-between">
+
+                          {/* Away Team - Clickable */}
                           <button
                             onClick={() => toggleGamePick(game, game.away_team)}
-                            className={`relative p-4 rounded-lg transition-all duration-200 ${
-                              selectedPick?.picked_winner === game.away_team
-                                ? 'bg-emerald-600 text-white ring-4 ring-emerald-400/50 scale-105'
-                                : 'bg-slate-700 text-white hover:bg-slate-600 hover:scale-102'
-                            }`}
+                            className={`flex items-center space-x-2.5 flex-1 transition-all ${selectedPick?.picked_winner === game.away_team
+                              ? 'opacity-100'
+                              : 'opacity-70 hover:opacity-100'
+                              }`}
                           >
-                            {/* Selected Checkmark */}
-                            {selectedPick?.picked_winner === game.away_team && (
-                              <div className="absolute top-2 right-2 w-6 h-6 bg-white rounded-full flex items-center justify-center">
-                                <span className="text-emerald-600 font-bold text-sm">✓</span>
-                              </div>
-                            )}
-
-                            {/* Team Logo */}
-                            <div className="flex justify-center mb-3">
-                              <div className="w-16 h-16 bg-white rounded-lg p-2 flex items-center justify-center">
-                                {getTeamLogo(game.away_team) ? (
-                                  <img 
-                                    src={getTeamLogo(game.away_team)} 
-                                    alt={game.away_team}
-                                    className="w-full h-full object-contain"
-                                  />
-                                ) : (
-                                  <span className="text-2xl font-bold text-slate-800">
+                            {/* Away Team Logo */}
+                            <div className="w-12 h-12 flex-shrink-0">
+                              {getTeamLogo(game.away_team) ? (
+                                <img
+                                  src={getTeamLogo(game.away_team)}
+                                  alt={game.away_team}
+                                  className="w-full h-full object-contain drop-shadow-lg"
+                                />
+                              ) : (
+                                <div className="w-full h-full bg-slate-700 rounded-lg flex items-center justify-center">
+                                  <span className="text-lg font-bold text-white">
                                     {game.away_team.split(' ').pop().charAt(0)}
                                   </span>
-                                )}
-                              </div>
+                                </div>
+                              )}
                             </div>
 
-                            <div className="text-xs font-semibold opacity-75 mb-1">@ Away</div>
-                            <div className="font-bold text-sm mb-1">{game.away_team}</div>
-                            <div className="text-xs opacity-75">{awayRecord}</div>
-                            
-                            {game.away_win_probability && (
-                              <div className="mt-2 text-xs font-semibold">
-                                {(game.away_win_probability * 100).toFixed(1)}% to win
+                            {/* Away Team Info */}
+                            <div className="text-left">
+                              <div className={`text-xl font-bold leading-tight ${selectedPick?.picked_winner === game.away_team
+                                ? 'text-white'
+                                : 'text-slate-300'
+                                }`}>
+                                {game.away_team.split(' ').pop().toUpperCase().substring(0, 3)}
                               </div>
-                            )}
-
-                            {game.predicted_winner === game.away_team && (
-                              <div className="mt-2">
-                                <span className="text-xs bg-white/20 px-2 py-1 rounded">
-                                  AI Pick ⭐
-                                </span>
+                              <div className="text-slate-400 text-xs my-0.5">
+                                {awayRecord}
                               </div>
-                            )}
+                              <div className={`text-lg font-bold ${selectedPick?.picked_winner === game.away_team
+                                ? 'text-blue-400'
+                                : 'text-slate-400'
+                                }`}>
+                                {(awayProb * 100).toFixed(1)}%
+                              </div>
+                            </div>
                           </button>
 
-                          {/* Home Team */}
+                          {/* @ Symbol */}
+                          <div className="px-3">
+                            <div className="w-8 h-8 rounded-full bg-slate-700/50 flex items-center justify-center">
+                              <span className="text-slate-400 text-sm font-bold">@</span>
+                            </div>
+                          </div>
+
+                          {/* Home Team - Clickable */}
                           <button
                             onClick={() => toggleGamePick(game, game.home_team)}
-                            className={`relative p-4 rounded-lg transition-all duration-200 ${
-                              selectedPick?.picked_winner === game.home_team
-                                ? 'bg-emerald-600 text-white ring-4 ring-emerald-400/50 scale-105'
-                                : 'bg-slate-700 text-white hover:bg-slate-600 hover:scale-102'
-                            }`}
+                            className={`flex items-center space-x-2.5 flex-1 justify-end transition-all ${selectedPick?.picked_winner === game.home_team
+                              ? 'opacity-100'
+                              : 'opacity-70 hover:opacity-100'
+                              }`}
                           >
-                            {/* Selected Checkmark */}
-                            {selectedPick?.picked_winner === game.home_team && (
-                              <div className="absolute top-2 right-2 w-6 h-6 bg-white rounded-full flex items-center justify-center">
-                                <span className="text-emerald-600 font-bold text-sm">✓</span>
+                            {/* Home Team Info */}
+                            <div className="text-right">
+                              <div className={`text-xl font-bold leading-tight ${selectedPick?.picked_winner === game.home_team
+                                ? 'text-white'
+                                : 'text-slate-300'
+                                }`}>
+                                {game.home_team.split(' ').pop().toUpperCase().substring(0, 3)}
                               </div>
-                            )}
-
-                            {/* Team Logo */}
-                            <div className="flex justify-center mb-3">
-                              <div className="w-16 h-16 bg-white rounded-lg p-2 flex items-center justify-center">
-                                {getTeamLogo(game.home_team) ? (
-                                  <img 
-                                    src={getTeamLogo(game.home_team)} 
-                                    alt={game.home_team}
-                                    className="w-full h-full object-contain"
-                                  />
-                                ) : (
-                                  <span className="text-2xl font-bold text-slate-800">
-                                    {game.home_team.split(' ').pop().charAt(0)}
-                                  </span>
-                                )}
+                              <div className="text-slate-400 text-xs my-0.5">
+                                {homeRecord}
+                              </div>
+                              <div className={`text-lg font-bold ${selectedPick?.picked_winner === game.home_team
+                                ? 'text-emerald-400'
+                                : 'text-slate-400'
+                                }`}>
+                                {(homeProb * 100).toFixed(1)}%
                               </div>
                             </div>
 
-                            <div className="text-xs font-semibold opacity-75 mb-1">Home</div>
-                            <div className="font-bold text-sm mb-1">{game.home_team}</div>
-                            <div className="text-xs opacity-75">{homeRecord}</div>
-                            
-                            {game.home_win_probability && (
-                              <div className="mt-2 text-xs font-semibold">
-                                {(game.home_win_probability * 100).toFixed(1)}% to win
-                              </div>
-                            )}
-
-                            {game.predicted_winner === game.home_team && (
-                              <div className="mt-2">
-                                <span className="text-xs bg-white/20 px-2 py-1 rounded">
-                                  AI Pick ⭐
-                                </span>
-                              </div>
-                            )}
+                            {/* Home Team Logo */}
+                            <div className="w-12 h-12 flex-shrink-0">
+                              {getTeamLogo(game.home_team) ? (
+                                <img
+                                  src={getTeamLogo(game.home_team)}
+                                  alt={game.home_team}
+                                  className="w-full h-full object-contain drop-shadow-lg"
+                                />
+                              ) : (
+                                <div className="w-full h-full bg-slate-700 rounded-lg flex items-center justify-center">
+                                  <span className="text-lg font-bold text-white">
+                                    {game.home_team.split(' ').pop().charAt(0)}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
                           </button>
-
                         </div>
+
+                        {/* Win Probability Bar */}
+                        <div className="px-3 pb-2">
+                          <div className="h-1.5 bg-slate-900 rounded-full overflow-hidden flex">
+                            <div
+                              className="bg-blue-500 transition-all"
+                              style={{ width: `${awayProb * 100}%` }}
+                            />
+                            <div
+                              className="bg-emerald-500 transition-all"
+                              style={{ width: `${homeProb * 100}%` }}
+                            />
+                          </div>
+                        </div>
+
+                        {/* Selected Indicator */}
+                        {isSelected && (
+                          <div className="px-3 pb-2">
+                            <div className="bg-emerald-500/20 border border-emerald-500/50 rounded py-1 text-center">
+                              <span className="text-emerald-400 font-semibold text-xs">
+                                ✓ {selectedPick.picked_winner} selected
+                              </span>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     );
                   })}
@@ -454,10 +497,10 @@ export default function ParlayBuilderPage() {
                         ) : calculatedProb ? (
                           <>
                             <div className="text-4xl font-bold mb-2">
-                              {(calculatedProb.combined_probability * 100).toFixed(1)}%
+                              {calculatedProb.combinedProbability}%
                             </div>
                             <div className="text-xs opacity-90">
-                              Risk Level: <span className="font-bold">{calculatedProb.risk_level}</span>
+                              Risk Level: <span className="font-bold">{calculatedProb.riskLevel}</span>
                             </div>
                           </>
                         ) : (
@@ -485,11 +528,10 @@ export default function ParlayBuilderPage() {
                   <button
                     onClick={handleSaveParlay}
                     disabled={saving || selectedPicks.length < 2 || !parlayName.trim()}
-                    className={`w-full py-3 rounded-lg font-bold text-white transition-all ${
-                      saving || selectedPicks.length < 2 || !parlayName.trim()
-                        ? 'bg-slate-700 cursor-not-allowed'
-                        : 'bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700'
-                    }`}
+                    className={`w-full py-3 rounded-lg font-bold text-white transition-all ${saving || selectedPicks.length < 2 || !parlayName.trim()
+                      ? 'bg-slate-700 cursor-not-allowed'
+                      : 'bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700'
+                      }`}
                   >
                     {saving ? 'Saving...' : '💾 Save Parlay'}
                   </button>

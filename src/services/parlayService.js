@@ -15,23 +15,31 @@ class ParlayService {
     try {
       const result = await pool.query(
         `SELECT 
-          g.id,
-          g.season,
-          g.week,
-          g.game_date,
-          g.home_team,
-          g.away_team,
-          g.home_score,
-          g.away_score,
-          g.is_final,
-          p.predicted_winner,
-          p.confidence as confidence_level,
-          p.home_win_probability,
-          p.away_win_probability
-        FROM games g
-        LEFT JOIN predictions p ON g.game_id = p.game_id
-        WHERE g.season = $1 AND g.week = $2
-        ORDER BY g.game_date ASC`,
+    g.id,
+    g.season,
+    g.week,
+    g.game_date,
+    home_teams.name as home_team,
+    away_teams.name as away_team,
+    g.home_score,
+    g.away_score,
+    g.is_final,
+    p.predicted_winner,
+    p.confidence as confidence_level,
+    p.home_win_probability,
+    p.away_win_probability,
+    home_stats.wins as home_wins,
+    home_stats.losses as home_losses,
+    away_stats.wins as away_wins,
+    away_stats.losses as away_losses
+  FROM games g
+  LEFT JOIN teams home_teams ON g.home_team = home_teams.key
+  LEFT JOIN teams away_teams ON g.away_team = away_teams.key
+  LEFT JOIN predictions p ON g.game_id = p.game_id
+  LEFT JOIN team_statistics home_stats ON g.home_team = home_stats.team_key
+  LEFT JOIN team_statistics away_stats ON g.away_team = away_stats.team_key
+  WHERE g.season = $1 AND g.week = $2
+  ORDER BY g.game_date ASC`,
         [season, week]
       );
 

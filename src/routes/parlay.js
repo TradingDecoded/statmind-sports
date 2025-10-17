@@ -18,22 +18,37 @@ router.get('/available-games', requireAuth, async (req, res) => {
   try {
     const { season, week } = req.query;
 
-    // Use current season/week if not provided
-    const currentSeason = season ? parseInt(season) : 2025;
-    const currentWeek = week ? parseInt(week) : 7; // Default to week 7
+    // Calculate current week dynamically
+const now = new Date();
+const currentYear = now.getFullYear();
+const currentMonth = now.getMonth(); // 0-11
 
-    const games = await parlayService.getAvailableGames(
-      currentSeason,
-      currentWeek
-    );
+// NFL season logic: September (8) through February (1)
+let calculatedSeason = currentMonth >= 8 ? currentYear : currentYear;
+let calculatedWeek = 7; // Default fallback
 
-    res.json({
-      success: true,
-      games,
-      count: games.length,
-      week: currentWeek,
-      season: currentSeason
-    });
+// Simple week calculation (you can refine this)
+if (currentMonth === 9) { // October
+  const day = now.getDate();
+  calculatedWeek = Math.ceil((day + 7) / 7); // Rough estimate
+}
+
+const currentSeason = season ? parseInt(season) : calculatedSeason;
+const currentWeek = week ? parseInt(week) : calculatedWeek;
+
+// Get all games for the week
+const allGames = await parlayService.getAvailableGames(currentSeason, currentWeek);
+
+// Filter out completed games - only show upcoming
+const upcomingGames = allGames.filter(game => !game.is_final);
+
+res.json({
+  success: true,
+  games: upcomingGames,
+  count: upcomingGames.length,
+  week: currentWeek,
+  season: currentSeason
+});
 
   } catch (error) {
     console.error('Get available games error:', error);
