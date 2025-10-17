@@ -29,6 +29,7 @@ export default function Navigation() {
   const userLinks = user ? [
     { href: '/my-parlays', label: 'My Parlays' },
     { href: '/parlay-builder', label: 'Create Parlay' },
+    { href: '/leaderboard', label: '🏆 Leaderboard' },
   ] : [];
   
   return (

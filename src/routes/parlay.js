@@ -7,6 +7,7 @@ import express from 'express';
 import { body, validationResult } from 'express-validator';
 import parlayService from '../services/parlayService.js';
 import { requireAuth } from '../middleware/authMiddleware.js';
+import pool from '../config/database.js';
 
 const router = express.Router();
 
@@ -200,22 +201,94 @@ router.get('/:id', requireAuth, async (req, res) => {
 
 // ==========================================
 // DELETE /api/parlay/:id
-// Delete a pending parlay
+// Delete a parlay permanently
 // ==========================================
 router.delete('/:id', requireAuth, async (req, res) => {
   try {
-    const parlayId = parseInt(req.params.id);
+    const parlayId = req.params.id;
     const userId = req.user.id;
-
-    const result = await parlayService.deleteParlay(parlayId, userId);
-
-    res.json(result);
-
+    
+    console.log(`🗑️  Delete request for parlay ${parlayId} by user ${userId}`);
+    
+    // Make sure parlay belongs to this user
+    const checkResult = await pool.query(
+      'SELECT user_id, is_hit FROM user_parlays WHERE id = $1',
+      [parlayId]
+    );
+    
+    if (checkResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'Parlay not found'
+      });
+    }
+    
+    if (checkResult.rows[0].user_id !== userId) {
+      return res.status(403).json({
+        success: false,
+        error: 'Not authorized to delete this parlay'
+      });
+    }
+    
+    const parlayStatus = checkResult.rows[0].is_hit;
+    
+    // Delete the parlay
+    await pool.query('DELETE FROM user_parlays WHERE id = $1', [parlayId]);
+    
+    // Update user stats based on parlay status
+    if (parlayStatus === null) {
+      // Was pending
+      await pool.query(
+        `UPDATE user_stats 
+         SET total_parlays = GREATEST(0, total_parlays - 1),
+             pending_parlays = GREATEST(0, pending_parlays - 1)
+         WHERE user_id = $1`,
+        [userId]
+      );
+    } else if (parlayStatus === true) {
+      // Was a win
+      await pool.query(
+        `UPDATE user_stats 
+         SET total_parlays = GREATEST(0, total_parlays - 1),
+             total_wins = GREATEST(0, total_wins - 1)
+         WHERE user_id = $1`,
+        [userId]
+      );
+    } else {
+      // Was a loss
+      await pool.query(
+        `UPDATE user_stats 
+         SET total_parlays = GREATEST(0, total_parlays - 1),
+             total_losses = GREATEST(0, total_losses - 1)
+         WHERE user_id = $1`,
+        [userId]
+      );
+    }
+    
+    // Recalculate win rate
+    await pool.query(
+      `UPDATE user_stats 
+       SET win_rate = CASE 
+         WHEN (total_wins + total_losses) > 0 
+         THEN ROUND((total_wins::DECIMAL / (total_wins + total_losses)) * 100, 2)
+         ELSE 0 
+       END
+       WHERE user_id = $1`,
+      [userId]
+    );
+    
+    console.log(`✅ Deleted parlay ${parlayId} for user ${userId}`);
+    
+    res.json({
+      success: true,
+      message: 'Parlay deleted successfully'
+    });
+    
   } catch (error) {
-    console.error('Delete parlay error:', error);
-    res.status(400).json({
+    console.error('❌ Delete parlay error:', error);
+    res.status(500).json({
       success: false,
-      error: error.message
+      error: 'Failed to delete parlay'
     });
   }
 });

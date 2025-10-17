@@ -19,7 +19,8 @@ import analyticsRouter from "./routes/analytics.js";
 import authRoutes from './routes/auth.js';
 import parlayRoutes from './routes/parlay.js';
 import usersRoutes from './routes/users.js';
-
+import './jobs/resolveParlays.js';
+import leaderboardRoutes from './routes/leaderboard.js';
 
 dotenv.config();
 const app = express();
@@ -140,6 +141,7 @@ app.use("/api/analytics", analyticsRouter);
 app.use('/api/auth', authRoutes);
 app.use('/api/parlay', parlayRoutes);
 app.use('/api/users', usersRoutes);
+app.use('/api/leaderboard', leaderboardRoutes);
 
 // ======================================
 // Start Server
