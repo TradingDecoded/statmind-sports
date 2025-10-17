@@ -112,8 +112,8 @@ class ESPNDataService {
   }
 
   /**
- * Update scores for completed games
- */
+  * Update scores for completed games
+  */
   async updateGameScores(season, week) {
     try {
       console.log(`🔄 Updating scores for ${season} Week ${week}...`);
@@ -140,8 +140,13 @@ class ESPNDataService {
 
           const query = `
           UPDATE games 
-          SET home_score = $1, away_score = $2
-          WHERE game_id = $3 AND home_score IS NULL
+          SET 
+            home_score = $1, 
+            away_score = $2,
+            is_final = true,
+            status = 'final',
+            updated_at = CURRENT_TIMESTAMP
+          WHERE game_id = $3 AND (home_score IS NULL OR is_final = false)
           RETURNING game_id
         `;
 

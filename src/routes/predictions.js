@@ -22,6 +22,9 @@ router.get("/", (req, res) => {
 // -----------------------------
 // GET predictions for a specific week/season
 // -----------------------------
+// -----------------------------
+// GET predictions for a specific week/season
+// -----------------------------
 router.get("/week/:season/:week", async (req, res) => {
   const { season, week } = req.params;
 
@@ -35,6 +38,10 @@ router.get("/week/:season/:week", async (req, res) => {
         g.game_date AS "date",
         g.home_team AS "homeTeamKey",
         g.away_team AS "awayTeamKey",
+        g.home_score AS "homeScore",
+        g.away_score AS "awayScore",
+        g.status,
+        g.is_final AS "isFinal",
         ht.name AS "homeTeamName",
         at.name AS "awayTeamName",
         p.predicted_winner AS "predictedWinner",
@@ -46,11 +53,14 @@ router.get("/week/:season/:week", async (req, res) => {
         p.power_score AS "powerScore",
         p.situational_score AS "situationalScore",
         p.matchup_score AS "matchupScore",
-        p.recent_form_score AS "recentFormScore"
+        p.recent_form_score AS "recentFormScore",
+        pr.actual_winner AS "actualWinner",
+        pr.is_correct AS "isCorrect"
       FROM predictions p
       JOIN games g ON p.game_id = g.game_id
       LEFT JOIN teams ht ON g.home_team = ht.key
       LEFT JOIN teams at ON g.away_team = at.key
+      LEFT JOIN prediction_results pr ON g.game_id = pr.game_id
       WHERE g.season = $1 AND g.week = $2
       ORDER BY g.game_date ASC
       `,
@@ -71,7 +81,6 @@ router.get("/week/:season/:week", async (req, res) => {
     });
   }
 });
-
 // -----------------------------
 // GET upcoming predictions (no scores yet)
 // -----------------------------

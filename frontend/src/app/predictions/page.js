@@ -22,6 +22,7 @@ export default function PredictionsPage() {
   const [week, setWeek] = useState(currentWeek);
   const [predictions, setPredictions] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [confidenceFilter, setConfidenceFilter] = useState('ALL');
   const [sortBy, setSortBy] = useState('date');
 
@@ -31,14 +32,59 @@ export default function PredictionsPage() {
 
   async function loadPredictions() {
     setLoading(true);
+    setError(null);
+    
     try {
+      // Fetch predictions for selected week
       const response = await fetch(`${API_BASE_URL}/predictions/week/${season}/${week}`);
       const data = await response.json();
-      setPredictions(data.predictions || []);
+      const predictions = data.predictions || [];
+      
+      if (!predictions || predictions.length === 0) {
+        setPredictions([]);
+        setLoading(false);
+        return;
+      }
+
+      // Check if ALL games in this week are finished
+      const allGamesFinished = predictions.every(pred => pred.isFinal && pred.homeScore !== null);
+      
+      // If all games finished, try to auto-advance to next week
+      if (allGamesFinished) {
+        console.log(`📅 All games in Week ${week} are finished. Checking for next week...`);
+        
+        // Try to load next week
+        const nextWeekResponse = await fetch(`${API_BASE_URL}/predictions/week/${season}/${week + 1}`);
+        const nextWeekData = await nextWeekResponse.json();
+        const nextWeekPredictions = nextWeekData.predictions || [];
+        
+        if (nextWeekPredictions && nextWeekPredictions.length > 0) {
+          // Check if next week has any unfinished games
+          const hasUpcomingGames = nextWeekPredictions.some(pred => !pred.isFinal);
+          
+          if (hasUpcomingGames) {
+            console.log(`✅ Auto-advancing to Week ${week + 1}`);
+            // Update to next week
+            const newUrl = `/predictions?season=${season}&week=${week + 1}`;
+            window.history.replaceState({}, '', newUrl);
+            setPredictions(nextWeekPredictions);
+            setLoading(false);
+            return;
+          }
+        }
+        
+        // No next week or no upcoming games, stay on current week
+        console.log(`⚠️ No upcoming games in Week ${week + 1}, staying on Week ${week}`);
+      }
+      
+      setPredictions(predictions);
+      
     } catch (error) {
       console.error('Error loading predictions:', error);
+      setError('Failed to load predictions');
       setPredictions([]);
     }
+    
     setLoading(false);
   }
 
