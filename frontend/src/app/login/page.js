@@ -18,7 +18,9 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      const response = await fetch('http://localhost:4000/api/auth/login', {
+      console.log('Starting login request...');
+
+      const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -26,18 +28,30 @@ export default function LoginPage() {
         body: JSON.stringify({ email, password }),
       });
 
-      const data = await response.json();
+      console.log('Response received, status:', response.status);
 
-      if (response.ok) {
-        login(data.user, data.token);
-        router.push('/parlay-builder');
-      } else {
-        setError(data.error || 'Login failed');
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Login failed:', errorData);
+        setError(errorData.error || 'Login failed');
+        setIsLoading(false);
+        return;
       }
+
+      const data = await response.json();
+      console.log('Login successful!', data);
+
+      // Store auth data
+      login(data.user, data.token);
+
+      console.log('Auth stored, redirecting...');
+
+      // Redirect
+      router.push('/parlay-builder');
+
     } catch (error) {
-      setError('Connection error. Please try again.');
       console.error('Login error:', error);
-    } finally {
+      setError('Connection error. Please try again.');
       setIsLoading(false);
     }
   };

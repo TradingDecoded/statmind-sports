@@ -18,6 +18,8 @@ import adminRouter from "./routes/admin.js";
 import analyticsRouter from "./routes/analytics.js";
 import authRoutes from './routes/auth.js';
 import parlayRoutes from './routes/parlay.js';
+import usersRoutes from './routes/users.js';
+
 
 dotenv.config();
 const app = express();
@@ -60,8 +62,10 @@ app.use(compression());
 // ✅ Restrict CORS in production, open in dev
 // ✅ Allow all origins for development
 app.use(cors({
-  origin: true,
-  credentials: true
+  origin: ['https://statmindsports.com', 'http://localhost:3001', 'http://localhost:3000'],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
 // ✅ Security headers
@@ -135,6 +139,7 @@ app.use("/api/admin", adminRouter);
 app.use("/api/analytics", analyticsRouter);
 app.use('/api/auth', authRoutes);
 app.use('/api/parlay', parlayRoutes);
+app.use('/api/users', usersRoutes);
 
 // ======================================
 // Start Server

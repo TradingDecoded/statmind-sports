@@ -8,21 +8,28 @@ export default function Navigation() {
   const pathname = usePathname();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [isStatsMenuOpen, setIsStatsMenuOpen] = useState(false);
   const { user, logout } = useAuth();
   
-  const publicLinks = [
+  // Simplified main navigation links
+  const mainLinks = [
     { href: '/', label: 'Home' },
     { href: '/predictions', label: 'Predictions' },
-    { href: '/results', label: 'Results' },
-    { href: '/analytics', label: 'Analytics' },
-    { href: '/accuracy', label: 'Accuracy' },
     { href: '/how-it-works', label: 'How It Works' },
   ];
 
-  const userLinks = [
-    { href: '/parlay-builder', label: 'Parlay Builder' },
-    { href: '/my-parlays', label: 'My Parlays' },
+  // Stats dropdown links
+  const statsLinks = [
+    { href: '/results', label: 'Results' },
+    { href: '/analytics', label: 'Analytics' },
+    { href: '/accuracy', label: 'Accuracy' },
   ];
+
+  // User-only links (shown when authenticated)
+  const userLinks = user ? [
+    { href: '/my-parlays', label: 'My Parlays' },
+    { href: '/parlay-builder', label: 'Create Parlay' },
+  ] : [];
   
   return (
     <nav className="bg-gradient-to-r from-slate-900 to-slate-800 border-b border-slate-700 sticky top-0 z-50 backdrop-blur-sm bg-opacity-95">
@@ -41,7 +48,8 @@ export default function Navigation() {
           
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center space-x-1">
-            {publicLinks.map((link) => (
+            {/* Main Links */}
+            {mainLinks.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
@@ -55,8 +63,8 @@ export default function Navigation() {
               </Link>
             ))}
 
-            {/* Conditional User Links */}
-            {user && userLinks.map((link) => (
+            {/* User Links (only if logged in) */}
+            {userLinks.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
@@ -70,7 +78,40 @@ export default function Navigation() {
               </Link>
             ))}
 
-            {/* Auth Buttons */}
+            {/* Stats Dropdown */}
+            <div className="relative">
+              <button
+                onClick={() => setIsStatsMenuOpen(!isStatsMenuOpen)}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center space-x-1 ${
+                  statsLinks.some(link => pathname === link.href)
+                    ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/50'
+                    : 'text-slate-300 hover:text-white hover:bg-slate-700'
+                }`}
+              >
+                <span>Stats</span>
+                <svg className={`w-4 h-4 transition-transform ${isStatsMenuOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+
+              {/* Stats Dropdown Menu */}
+              {isStatsMenuOpen && (
+                <div className="absolute left-0 mt-2 w-48 bg-slate-800 border border-slate-700 rounded-lg shadow-xl py-1 z-50">
+                  {statsLinks.map((link) => (
+                    <Link
+                      key={link.href}
+                      href={link.href}
+                      className="block px-4 py-2 text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors"
+                      onClick={() => setIsStatsMenuOpen(false)}
+                    >
+                      {link.label}
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Auth Section */}
             {user ? (
               // User Menu
               <div className="relative ml-3">
@@ -89,7 +130,7 @@ export default function Navigation() {
                   </svg>
                 </button>
 
-                {/* Dropdown Menu */}
+                {/* User Dropdown Menu */}
                 {isUserMenuOpen && (
                   <div className="absolute right-0 mt-2 w-48 bg-slate-800 border border-slate-700 rounded-lg shadow-xl py-1 z-50">
                     <div className="px-4 py-2 border-b border-slate-700">
@@ -102,13 +143,6 @@ export default function Navigation() {
                       onClick={() => setIsUserMenuOpen(false)}
                     >
                       My Profile
-                    </Link>
-                    <Link
-                      href="/my-parlays"
-                      className="block px-4 py-2 text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors"
-                      onClick={() => setIsUserMenuOpen(false)}
-                    >
-                      My Parlays
                     </Link>
                     <button
                       onClick={() => {
@@ -165,7 +199,8 @@ export default function Navigation() {
         {isMenuOpen && (
           <div className="md:hidden pb-4 border-t border-slate-700 mt-2">
             <div className="flex flex-col space-y-1 pt-2">
-              {publicLinks.map((link) => (
+              {/* Main Links */}
+              {mainLinks.map((link) => (
                 <Link
                   key={link.href}
                   href={link.href}
@@ -180,7 +215,8 @@ export default function Navigation() {
                 </Link>
               ))}
 
-              {user && userLinks.map((link) => (
+              {/* User Links (only if logged in) */}
+              {userLinks.map((link) => (
                 <Link
                   key={link.href}
                   href={link.href}
@@ -194,6 +230,27 @@ export default function Navigation() {
                   {link.label}
                 </Link>
               ))}
+
+              {/* Stats Section */}
+              <div className="border-t border-slate-700 pt-2 mt-2">
+                <p className="px-4 py-2 text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                  Statistics
+                </p>
+                {statsLinks.map((link) => (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    onClick={() => setIsMenuOpen(false)}
+                    className={`px-4 py-3 rounded-lg text-base font-medium transition-all duration-200 ${
+                      pathname === link.href
+                        ? 'bg-emerald-500 text-white'
+                        : 'text-slate-300 hover:text-white hover:bg-slate-700'
+                    }`}
+                  >
+                    {link.label}
+                  </Link>
+                ))}
+              </div>
 
               {/* Mobile Auth Section */}
               <div className="border-t border-slate-700 pt-2 mt-2">
