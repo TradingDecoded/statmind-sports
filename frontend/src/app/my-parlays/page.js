@@ -25,7 +25,7 @@ export default function MyParlaysPage() {
     setLoading(true);
     try {
       const token = localStorage.getItem('authToken');
-      const response = await fetch(`http://localhost:4000/api/parlay/mine?t=${Date.now()}`, {
+      const response = await fetch(`/api/parlay/mine?t=${Date.now()}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Cache-Control': 'no-cache, no-store, must-revalidate',
@@ -48,7 +48,7 @@ export default function MyParlaysPage() {
   const fetchUserStats = async () => {
     try {
       const token = localStorage.getItem('authToken');
-      const response = await fetch('http://localhost:4000/api/auth/me', {
+      const response = await fetch('/api/auth/me', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -68,7 +68,7 @@ export default function MyParlaysPage() {
 
     try {
       const token = localStorage.getItem('authToken');
-      const response = await fetch(`http://localhost:4000/api/parlay/${parlayId}`, {
+      const response = await fetch(`/api/parlay/${parlayId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`

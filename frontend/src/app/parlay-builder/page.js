@@ -71,7 +71,7 @@ export default function ParlayBuilderPage() {
     try {
       const token = localStorage.getItem('authToken');
       
-      const response = await fetch('http://localhost:4000/api/parlay/available-games', {
+      const response = await fetch('/api/parlay/available-games', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -151,7 +151,7 @@ export default function ParlayBuilderPage() {
         };
       });
 
-      const response = await fetch('http://localhost:4000/api/parlay/calculate', {
+      const response = await fetch('/api/parlay/calculate', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -188,7 +188,7 @@ export default function ParlayBuilderPage() {
     try {
       const token = localStorage.getItem('authToken');
 
-      const response = await fetch('http://localhost:4000/api/parlay/create', {
+      const response = await fetch('/api/parlay/create', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

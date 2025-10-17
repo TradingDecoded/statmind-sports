@@ -17,7 +17,7 @@ export default function UserProfilePage() {
 
   const fetchUserProfile = async () => {
     try {
-      const response = await fetch(`http://localhost:4000/api/users/${username}`);
+      const response = await fetch(`/api/users/${username}`);
       
       if (!response.ok) {
         if (response.status === 404) {

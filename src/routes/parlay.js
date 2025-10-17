@@ -30,7 +30,9 @@ router.get('/available-games', requireAuth, async (req, res) => {
     res.json({
       success: true,
       games,
-      count: games.length
+      count: games.length,
+      week: currentWeek,
+      season: currentSeason
     });
 
   } catch (error) {
