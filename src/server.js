@@ -21,6 +21,7 @@ import parlayRoutes from './routes/parlay.js';
 import usersRoutes from './routes/users.js';
 import './jobs/resolveParlays.js';
 import leaderboardRoutes from './routes/leaderboard.js';
+import notificationsRoutes from './routes/notifications.js';
 
 dotenv.config();
 const app = express();
@@ -142,6 +143,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/parlay', parlayRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/leaderboard', leaderboardRoutes);
+app.use('/api/notifications', notificationsRoutes);
 
 // ======================================
 // Start Server

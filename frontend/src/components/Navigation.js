@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import NotificationBell from './NotificationBell';
 
 export default function Navigation() {
   const pathname = usePathname();
@@ -10,7 +11,7 @@ export default function Navigation() {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isStatsMenuOpen, setIsStatsMenuOpen] = useState(false);
   const { user, logout } = useAuth();
-  
+
   // Simplified main navigation links
   const mainLinks = [
     { href: '/', label: 'Home' },
@@ -31,7 +32,7 @@ export default function Navigation() {
     { href: '/parlay-builder', label: 'Create Parlay' },
     { href: '/leaderboard', label: '🏆 Leaderboard' },
   ] : [];
-  
+
   return (
     <nav className="bg-gradient-to-r from-slate-900 to-slate-800 border-b border-slate-700 sticky top-0 z-50 backdrop-blur-sm bg-opacity-95">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -46,7 +47,7 @@ export default function Navigation() {
               <span className="text-emerald-400 text-xs leading-tight">Sports</span>
             </div>
           </Link>
-          
+
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center space-x-1">
             {/* Main Links */}
@@ -54,11 +55,10 @@ export default function Navigation() {
               <Link
                 key={link.href}
                 href={link.href}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
-                  pathname === link.href
-                    ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/50'
-                    : 'text-slate-300 hover:text-white hover:bg-slate-700'
-                }`}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${pathname === link.href
+                  ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/50'
+                  : 'text-slate-300 hover:text-white hover:bg-slate-700'
+                  }`}
               >
                 {link.label}
               </Link>
@@ -69,11 +69,10 @@ export default function Navigation() {
               <Link
                 key={link.href}
                 href={link.href}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
-                  pathname === link.href
-                    ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/50'
-                    : 'text-slate-300 hover:text-white hover:bg-slate-700'
-                }`}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${pathname === link.href
+                  ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/50'
+                  : 'text-slate-300 hover:text-white hover:bg-slate-700'
+                  }`}
               >
                 {link.label}
               </Link>
@@ -83,11 +82,10 @@ export default function Navigation() {
             <div className="relative">
               <button
                 onClick={() => setIsStatsMenuOpen(!isStatsMenuOpen)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center space-x-1 ${
-                  statsLinks.some(link => pathname === link.href)
-                    ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/50'
-                    : 'text-slate-300 hover:text-white hover:bg-slate-700'
-                }`}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center space-x-1 ${statsLinks.some(link => pathname === link.href)
+                  ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/50'
+                  : 'text-slate-300 hover:text-white hover:bg-slate-700'
+                  }`}
               >
                 <span>Stats</span>
                 <svg className={`w-4 h-4 transition-transform ${isStatsMenuOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -111,6 +109,9 @@ export default function Navigation() {
                 </div>
               )}
             </div>
+
+            {/* Notification Bell (only when logged in) */}
+            {user && <NotificationBell />}
 
             {/* Auth Section */}
             {user ? (
@@ -175,10 +176,10 @@ export default function Navigation() {
               </div>
             )}
           </div>
-          
+
           {/* Mobile Menu Button */}
           <div className="md:hidden">
-            <button 
+            <button
               onClick={() => setIsMenuOpen(!isMenuOpen)}
               className="text-slate-300 hover:text-white p-2 focus:outline-none focus:ring-2 focus:ring-emerald-500 rounded-lg"
               aria-label="Toggle mobile menu"
@@ -195,7 +196,7 @@ export default function Navigation() {
             </button>
           </div>
         </div>
-        
+
         {/* Mobile Menu Dropdown */}
         {isMenuOpen && (
           <div className="md:hidden pb-4 border-t border-slate-700 mt-2">
@@ -206,11 +207,10 @@ export default function Navigation() {
                   key={link.href}
                   href={link.href}
                   onClick={() => setIsMenuOpen(false)}
-                  className={`px-4 py-3 rounded-lg text-base font-medium transition-all duration-200 ${
-                    pathname === link.href
-                      ? 'bg-emerald-500 text-white'
-                      : 'text-slate-300 hover:text-white hover:bg-slate-700'
-                  }`}
+                  className={`px-4 py-3 rounded-lg text-base font-medium transition-all duration-200 ${pathname === link.href
+                    ? 'bg-emerald-500 text-white'
+                    : 'text-slate-300 hover:text-white hover:bg-slate-700'
+                    }`}
                 >
                   {link.label}
                 </Link>
@@ -222,11 +222,10 @@ export default function Navigation() {
                   key={link.href}
                   href={link.href}
                   onClick={() => setIsMenuOpen(false)}
-                  className={`px-4 py-3 rounded-lg text-base font-medium transition-all duration-200 ${
-                    pathname === link.href
-                      ? 'bg-emerald-500 text-white'
-                      : 'text-slate-300 hover:text-white hover:bg-slate-700'
-                  }`}
+                  className={`px-4 py-3 rounded-lg text-base font-medium transition-all duration-200 ${pathname === link.href
+                    ? 'bg-emerald-500 text-white'
+                    : 'text-slate-300 hover:text-white hover:bg-slate-700'
+                    }`}
                 >
                   {link.label}
                 </Link>
@@ -242,11 +241,10 @@ export default function Navigation() {
                     key={link.href}
                     href={link.href}
                     onClick={() => setIsMenuOpen(false)}
-                    className={`px-4 py-3 rounded-lg text-base font-medium transition-all duration-200 ${
-                      pathname === link.href
-                        ? 'bg-emerald-500 text-white'
-                        : 'text-slate-300 hover:text-white hover:bg-slate-700'
-                    }`}
+                    className={`px-4 py-3 rounded-lg text-base font-medium transition-all duration-200 ${pathname === link.href
+                      ? 'bg-emerald-500 text-white'
+                      : 'text-slate-300 hover:text-white hover:bg-slate-700'
+                      }`}
                   >
                     {link.label}
                   </Link>
