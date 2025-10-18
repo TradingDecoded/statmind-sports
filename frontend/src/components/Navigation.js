@@ -16,8 +16,8 @@ export default function Navigation() {
   // Simplified main navigation links
   const mainLinks = [
     { href: '/', label: 'Home' },
-    { href: '/predictions', label: 'Predictions' },
     { href: '/how-it-works', label: 'How It Works' },
+    { href: '/predictions', label: 'Predictions' },
   ];
 
   // Stats dropdown links
@@ -31,6 +31,7 @@ export default function Navigation() {
   const userLinks = user ? [
     { href: '/parlay-builder', label: 'Create Parlay' },
     { href: '/leaderboard', label: '🏆 Leaderboard' },
+    ...(user.is_admin ? [{ href: '/admin', label: '⚙️ Admin' }] : []),
   ] : [];
 
   return (

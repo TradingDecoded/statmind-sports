@@ -5,7 +5,7 @@ import { useAuth } from '../../contexts/AuthContext';
 
 export default function ParlayBuilderPage() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, isLoading } = useAuth();
 
   const [availableGames, setAvailableGames] = useState([]);
   const [selectedPicks, setSelectedPicks] = useState([]);
@@ -60,12 +60,18 @@ export default function ParlayBuilderPage() {
   };
 
   useEffect(() => {
+    // Don't redirect while still checking auth
+    if (isLoading) {
+      return;
+    }
+
     if (!user) {
       router.push('/login');
       return;
     }
+
     fetchAvailableGames();
-  }, [user]);
+  }, [user, isLoading]);
 
   const fetchAvailableGames = async () => {
     try {

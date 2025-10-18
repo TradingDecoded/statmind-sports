@@ -46,8 +46,8 @@ export default function LoginPage() {
 
       console.log('Auth stored, redirecting...');
 
-      // Redirect
-      router.push('/parlay-builder');
+      // Force full page reload to update navigation
+      window.location.href = '/';
 
     } catch (error) {
       console.error('Login error:', error);

@@ -13,7 +13,7 @@ const JWT_EXPIRES_IN = '7d'; // Tokens expire in 7 days
 const SALT_ROUNDS = 10;
 
 class AuthService {
-  
+
   // ==========================================
   // REGISTER NEW USER
   // ==========================================
@@ -24,24 +24,24 @@ class AuthService {
         'SELECT id FROM users WHERE username = $1',
         [username]
       );
-      
+
       if (usernameCheck.rows.length > 0) {
         throw new Error('Username already taken');
       }
-      
+
       // 2. Check if email already exists
       const emailCheck = await pool.query(
         'SELECT id FROM users WHERE email = $1',
         [email]
       );
-      
+
       if (emailCheck.rows.length > 0) {
         throw new Error('Email already registered');
       }
-      
+
       // 3. Hash the password
       const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
-      
+
       // 4. Insert new user
       const result = await pool.query(
         `INSERT INTO users (username, email, password_hash, display_name)
@@ -49,20 +49,20 @@ class AuthService {
          RETURNING id, username, email, display_name, created_at`,
         [username, email, passwordHash, displayName || username]
       );
-      
+
       const user = result.rows[0];
-      
+
       // 5. Create user stats entry
       await pool.query(
         'INSERT INTO user_stats (user_id) VALUES ($1)',
         [user.id]
       );
-      
+
       // 6. Generate JWT token
       const token = this.generateToken(user);
-      
+
       console.log(`✅ New user registered: ${username}`);
-      
+
       return {
         success: true,
         user: {
@@ -70,17 +70,18 @@ class AuthService {
           username: user.username,
           email: user.email,
           displayName: user.display_name,
-          createdAt: user.created_at
+          avatarUrl: user.avatar_url,
+          is_admin: user.is_admin
         },
         token
       };
-      
+
     } catch (error) {
       console.error('Registration error:', error);
       throw error;
     }
   }
-  
+
   // ==========================================
   // LOGIN USER
   // ==========================================
@@ -88,36 +89,36 @@ class AuthService {
     try {
       // 1. Find user by email
       const result = await pool.query(
-        `SELECT id, username, email, password_hash, display_name, avatar_url
+        `SELECT id, username, email, password_hash, display_name, avatar_url, is_admin
          FROM users
          WHERE email = $1 AND is_active = true`,
         [email]
       );
-      
+
       if (result.rows.length === 0) {
         throw new Error('Invalid email or password');
       }
-      
+
       const user = result.rows[0];
-      
+
       // 2. Check password
       const validPassword = await bcrypt.compare(password, user.password_hash);
-      
+
       if (!validPassword) {
         throw new Error('Invalid email or password');
       }
-      
+
       // 3. Update last_active
       await pool.query(
         'UPDATE users SET last_active = CURRENT_TIMESTAMP WHERE id = $1',
         [user.id]
       );
-      
+
       // 4. Generate JWT token
       const token = this.generateToken(user);
-      
+
       console.log(`✅ User logged in: ${user.username}`);
-      
+
       return {
         success: true,
         user: {
@@ -129,13 +130,13 @@ class AuthService {
         },
         token
       };
-      
+
     } catch (error) {
       console.error('Login error:', error);
       throw error;
     }
   }
-  
+
   // ==========================================
   // GENERATE JWT TOKEN
   // ==========================================
@@ -144,13 +145,14 @@ class AuthService {
       {
         userId: user.id,
         username: user.username,
-        email: user.email
+        email: user.email,
+        isAdmin: user.is_admin || false
       },
       JWT_SECRET,
       { expiresIn: JWT_EXPIRES_IN }
     );
   }
-  
+
   // ==========================================
   // VERIFY JWT TOKEN
   // ==========================================
@@ -161,7 +163,7 @@ class AuthService {
       throw new Error('Invalid or expired token');
     }
   }
-  
+
   // ==========================================
   // GET USER BY ID
   // ==========================================
@@ -169,7 +171,7 @@ class AuthService {
     try {
       const result = await pool.query(
         `SELECT u.id, u.username, u.email, u.display_name, u.avatar_url, u.bio,
-        u.account_tier, u.membership_tier, u.sms_bucks, u.created_at,
+        u.account_tier, u.membership_tier, u.sms_bucks, u.is_admin, u.created_at,
                 s.total_parlays, s.total_wins, s.total_losses, s.win_rate,
                 s.current_streak, s.best_streak
          FROM users u
@@ -177,11 +179,11 @@ class AuthService {
          WHERE u.id = $1 AND u.is_active = true`,
         [userId]
       );
-      
+
       if (result.rows.length === 0) {
         throw new Error('User not found');
       }
-      
+
       return result.rows[0];
     } catch (error) {
       console.error('Get user error:', error);
