@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { fetchUpcomingPredictions } from '@/utils/api';
 import PredictionCard from '@/components/PredictionCard';
 import StatsCard from '@/components/StatsCard';
+import CompetitionHero from '../components/CompetitionHero';
 
 export default function HomePage() {
   const [predictions, setPredictions] = useState([]);
@@ -118,7 +119,9 @@ export default function HomePage() {
   return (
     <div className="min-h-screen">
       {/* Hero Section */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-emerald-900 py-20 px-4">
+      <section className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-emerald-900 pt-2 pb-20 px-4">
+        {/* Competition Banner */}
+        <CompetitionHero />
         <div className="absolute inset-0 bg-grid-white/[0.02] bg-[size:50px_50px]"></div>
         <div className="max-w-7xl mx-auto relative">
           <div className="text-center mb-12">

@@ -22,16 +22,16 @@ export default function LeaderboardPage() {
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
-      
-      const endpoint = activeTab === 'overall' 
+
+      const endpoint = activeTab === 'overall'
         ? '/api/leaderboard/overall'
         : '/api/leaderboard/weekly';
-      
+
       const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
-      
+
       const response = await fetch(endpoint, { headers });
       const data = await response.json();
-      
+
       if (data.success) {
         setLeaderboardData(data.leaderboard);
         setMyRank(data.my_rank);
@@ -50,7 +50,7 @@ export default function LeaderboardPage() {
     try {
       const response = await fetch('/api/leaderboard/stats');
       const data = await response.json();
-      
+
       if (data.success) {
         setStats(data.stats);
       }
@@ -76,7 +76,7 @@ export default function LeaderboardPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-gray-900 text-white">
       <div className="container mx-auto px-4 py-8">
-        
+
         {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-5xl font-bold mb-2 bg-gradient-to-r from-yellow-400 to-orange-500 bg-clip-text text-transparent">
@@ -122,25 +122,38 @@ export default function LeaderboardPage() {
         <div className="flex justify-center mb-8 space-x-4">
           <button
             onClick={() => setActiveTab('overall')}
-            className={`px-6 py-3 rounded-lg font-semibold transition-all ${
-              activeTab === 'overall'
-                ? 'bg-blue-600 text-white shadow-lg'
-                : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
-            }`}
+            className={`px-6 py-3 rounded-lg font-semibold transition-all ${activeTab === 'overall'
+              ? 'bg-blue-600 text-white shadow-lg'
+              : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+              }`}
           >
             🏆 Overall
           </button>
           <button
             onClick={() => setActiveTab('weekly')}
-            className={`px-6 py-3 rounded-lg font-semibold transition-all ${
-              activeTab === 'weekly'
-                ? 'bg-blue-600 text-white shadow-lg'
-                : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
-            }`}
+            className={`px-6 py-3 rounded-lg font-semibold transition-all ${activeTab === 'weekly'
+              ? 'bg-blue-600 text-white shadow-lg'
+              : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+              }`}
           >
             📅 This Week
           </button>
         </div>
+
+        {/* Competition Rules Link - Shows only on Weekly tab */}
+        {activeTab === 'weekly' ? (
+          <div className="text-center mb-6 mt-4">
+            <button
+              onClick={() => {
+                localStorage.removeItem('competition_rules_opted_out');
+                router.push('/competition/rules');
+              }}
+              className="text-amber-400 hover:text-amber-300 underline text-sm font-semibold transition-colors cursor-pointer"
+            >
+              📋 View Weekly Competition Rules & Prize Info
+            </button>
+          </div>
+        ) : null}
 
         {/* Loading State */}
         {loading && (
@@ -177,8 +190,8 @@ export default function LeaderboardPage() {
                 {leaderboardData.map((user, index) => {
                   const rank = parseInt(user.rank);
                   const isTopThree = rank <= 3;
-                  const totalParlays = activeTab === 'overall' 
-                    ? user.total_parlays 
+                  const totalParlays = activeTab === 'overall'
+                    ? user.total_parlays
                     : user.weekly_parlays;
                   const wins = activeTab === 'overall'
                     ? user.total_wins
@@ -189,13 +202,12 @@ export default function LeaderboardPage() {
                   const winRate = activeTab === 'overall'
                     ? user.win_rate
                     : user.weekly_win_rate;
-                  
+
                   return (
-                    <tr 
+                    <tr
                       key={user.id}
-                      className={`hover:bg-gray-700 transition-colors cursor-pointer ${
-                        isTopThree ? 'bg-gradient-to-r from-yellow-900/20 to-transparent' : ''
-                      }`}
+                      className={`hover:bg-gray-700 transition-colors cursor-pointer ${isTopThree ? 'bg-gradient-to-r from-yellow-900/20 to-transparent' : ''
+                        }`}
                       onClick={() => router.push(`/profile/${user.username}`)}
                     >
                       <td className="px-6 py-4">
@@ -220,11 +232,10 @@ export default function LeaderboardPage() {
                         <div className="text-lg font-semibold">{totalParlays}</div>
                       </td>
                       <td className="px-6 py-4 text-center">
-                        <div className={`text-lg font-bold ${
-                          winRate >= 60 ? 'text-green-400' :
+                        <div className={`text-lg font-bold ${winRate >= 60 ? 'text-green-400' :
                           winRate >= 50 ? 'text-yellow-400' :
-                          'text-red-400'
-                        }`}>
+                            'text-red-400'
+                          }`}>
                           {winRate}%
                         </div>
                       </td>
@@ -236,11 +247,10 @@ export default function LeaderboardPage() {
                         </div>
                       </td>
                       <td className="px-6 py-4 text-center">
-                        <div className={`text-lg font-semibold ${
-                          user.current_streak > 0 ? 'text-green-400' :
+                        <div className={`text-lg font-semibold ${user.current_streak > 0 ? 'text-green-400' :
                           user.current_streak < 0 ? 'text-red-400' :
-                          'text-gray-400'
-                        }`}>
+                            'text-gray-400'
+                          }`}>
                           {getStreakEmoji(user.current_streak)} {user.current_streak}
                         </div>
                       </td>

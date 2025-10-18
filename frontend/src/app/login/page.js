@@ -127,16 +127,7 @@ export default function LoginPage() {
               </Link>
             </p>
           </div>
-
-          {/* Test Credentials */}
-          <div className="mt-6 pt-6 border-t border-slate-800">
-            <p className="text-slate-500 text-xs mb-2">Test Credentials:</p>
-            <div className="bg-slate-800/50 rounded p-3 text-xs font-mono">
-              <p className="text-slate-400">Email: parlaytest@statmind.com</p>
-              <p className="text-slate-400">Password: Parlay2025!</p>
-            </div>
           </div>
-        </div>
       </div>
     </div>
   );
