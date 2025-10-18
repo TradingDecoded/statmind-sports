@@ -7,7 +7,7 @@ import { useAuth } from '../../contexts/AuthContext';
 export default function AdminPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
-  const [activeTab, setActiveTab] = useState('weights');
+  const [activeTab, setActiveTab] = useState('members');
 
   // Members management state
   const [members, setMembers] = useState([]);
@@ -22,7 +22,7 @@ export default function AdminPage() {
   const [selectedMember, setSelectedMember] = useState(null);
   const [memberDetails, setMemberDetails] = useState(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
-  
+
   // User management action states
   const [adjustBucksAmount, setAdjustBucksAmount] = useState('');
   const [adjustBucksReason, setAdjustBucksReason] = useState('');
@@ -39,15 +39,6 @@ export default function AdminPage() {
     recentForm: 20
   });
   const [saveMessage, setSaveMessage] = useState('');
-
-  // SMS Bucks management state
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState([]);
-  const [selectedUser, setSelectedUser] = useState(null);
-  const [adjustAmount, setAdjustAmount] = useState('');
-  const [transactionType, setTransactionType] = useState('admin_adjustment');
-  const [description, setDescription] = useState('');
-  const [adjustMessage, setAdjustMessage] = useState('');
 
   // Check if user is admin
   useEffect(() => {
@@ -182,21 +173,22 @@ export default function AdminPage() {
 
   // Adjust SMS Bucks
   const handleAdjustBucks = async () => {
-    if (!selectedUser || !adjustAmount) {
-      setAdjustMessage('⚠️ Please enter an amount');
+    if (!selectedMember || !adjustBucksAmount) {
+      setActionMessage('⚠️ Please enter an amount');
       return;
     }
 
-    const amount = parseInt(adjustAmount);
+    const amount = parseInt(adjustBucksAmount);
     if (isNaN(amount) || amount === 0) {
-      setAdjustMessage('⚠️ Amount must be a non-zero number');
+      setActionMessage('⚠️ Amount must be a non-zero number');
       return;
     }
 
+    setActionLoading(true);
     const token = localStorage.getItem('authToken');
 
     try {
-      const response = await fetch(`/api/admin/management/users/${selectedUser.id}/adjust-bucks`, {
+      const response = await fetch(`/api/admin/management/members/${selectedMember.id}/adjust-bucks`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -204,24 +196,28 @@ export default function AdminPage() {
         },
         body: JSON.stringify({
           amount: amount,
-          type: transactionType,
-          description: description || `Admin adjustment: ${amount > 0 ? '+' : ''}${amount} SMS Bucks`
+          reason: adjustBucksReason || `Admin adjustment: ${amount > 0 ? '+' : ''}${amount} SMS Bucks`
         })
       });
 
       const data = await response.json();
 
       if (response.ok) {
-        setAdjustMessage(`✅ Balance updated! New balance: ${data.newBalance} SMS Bucks`);
-        setSelectedUser({ ...selectedUser, sms_bucks: data.newBalance });
-        setAdjustAmount('');
-        setDescription('');
-        setTimeout(() => setAdjustMessage(''), 3000);
+        setActionMessage(`✅ ${data.message}`);
+        // Refresh user details
+        fetchUserDetails(selectedMember.id);
+        // Refresh members list
+        fetchMembers();
+        // Clear form
+        setAdjustBucksAmount('');
+        setAdjustBucksReason('');
       } else {
-        setAdjustMessage(`❌ ${data.error}`);
+        setActionMessage(`❌ ${data.error}`);
       }
     } catch (error) {
-      setAdjustMessage('❌ Failed to adjust balance');
+      setActionMessage('❌ Failed to adjust balance');
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -327,6 +323,54 @@ export default function AdminPage() {
     }
   };
 
+  // Trigger fetch when filter/search/page changes
+  useEffect(() => {
+    if (activeTab === 'members') {
+      fetchMembers();
+    }
+  }, [memberFilter, memberSearch, currentPage, activeTab]);
+
+  // Calculate total percentage
+  const totalPercentage = Object.values(weights).reduce((sum, val) => sum + val, 0);
+
+  // Save weights
+  const handleSaveWeights = async () => {
+    if (Math.abs(totalPercentage - 100) > 0.1) {
+      setSaveMessage('⚠️ Weights must total 100%');
+      return;
+    }
+
+    const token = localStorage.getItem('authToken');
+
+    const weightsDecimal = {};
+    Object.entries(weights).forEach(([key, value]) => {
+      weightsDecimal[key] = value / 100;
+    });
+
+    try {
+      const response = await fetch('/api/admin/weights', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ weights: weightsDecimal }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setSaveMessage('✅ Weights saved successfully!');
+        setTimeout(() => setSaveMessage(''), 3000);
+      } else {
+        setSaveMessage('❌ Failed to save weights');
+      }
+    } catch (error) {
+      console.error('Save weights error:', error);
+      setSaveMessage('❌ Failed to save weights');
+    }
+  };
+
   // Show loading state
   if (isLoading) {
     return (
@@ -360,31 +404,22 @@ export default function AdminPage() {
         {/* Tabs */}
         <div className="flex gap-2 mb-6 border-b border-slate-700">
           <button
-            onClick={() => setActiveTab('weights')}
-            className={`px-6 py-3 font-medium transition-all ${activeTab === 'weights'
-                ? 'text-emerald-400 border-b-2 border-emerald-400'
-                : 'text-slate-400 hover:text-white'
-              }`}
-          >
-            ⚙️ Prediction Weights
-          </button>
-          <button
-            onClick={() => setActiveTab('smsbucks')}
-            className={`px-6 py-3 font-medium transition-all ${activeTab === 'smsbucks'
-                ? 'text-emerald-400 border-b-2 border-emerald-400'
-                : 'text-slate-400 hover:text-white'
-              }`}
-          >
-            💰 SMS Bucks Management
-          </button>
-          <button
             onClick={() => setActiveTab('members')}
             className={`px-6 py-3 font-medium transition-all ${activeTab === 'members'
-                ? 'text-emerald-400 border-b-2 border-emerald-400'
-                : 'text-slate-400 hover:text-white'
+              ? 'text-emerald-400 border-b-2 border-emerald-400'
+              : 'text-slate-400 hover:text-white'
               }`}
           >
             👥 Members
+          </button>
+          <button
+            onClick={() => setActiveTab('weights')}
+            className={`px-6 py-3 font-medium transition-all ${activeTab === 'weights'
+              ? 'text-emerald-400 border-b-2 border-emerald-400'
+              : 'text-slate-400 hover:text-white'
+              }`}
+          >
+            ⚙️ Prediction Weights
           </button>
         </div>
 
@@ -492,7 +527,7 @@ export default function AdminPage() {
               <div className="flex justify-between items-center">
                 <span className="text-lg font-semibold text-white">Total Weight:</span>
                 <span className={`text-2xl font-bold ${Math.abs(totalPercentage - 100) < 0.1 ?
-                    'text-emerald-400' : 'text-red-400'
+                  'text-emerald-400' : 'text-red-400'
                   }`}>
                   {totalPercentage.toFixed(1)}%
                 </span>
@@ -518,138 +553,6 @@ export default function AdminPage() {
                 <span className="text-sm font-medium">{saveMessage}</span>
               )}
             </div>
-          </div>
-        )}
-
-        {/* SMS Bucks Management Tab */}
-        {activeTab === 'smsbucks' && (
-          <div className="space-y-6">
-            {/* Search Section */}
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
-              <h2 className="text-2xl font-bold text-white mb-4">
-                Search Users
-              </h2>
-              <div className="relative">
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => handleSearchUsers(e.target.value)}
-                  placeholder="Search by email or username..."
-                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-emerald-500"
-                />
-
-                {/* Search Results Dropdown */}
-                {searchResults.length > 0 && (
-                  <div className="absolute z-10 w-full mt-2 bg-slate-800 border border-slate-700 rounded-lg shadow-xl max-h-64 overflow-y-auto">
-                    {searchResults.map(user => (
-                      <button
-                        key={user.id}
-                        onClick={() => handleSelectUser(user)}
-                        className="w-full px-4 py-3 text-left hover:bg-slate-700 transition border-b border-slate-700 last:border-b-0"
-                      >
-                        <div className="flex justify-between items-center">
-                          <div>
-                            <p className="text-white font-medium">{user.username}</p>
-                            <p className="text-slate-400 text-sm">{user.email}</p>
-                          </div>
-                          <div className="text-right">
-                            <p className="text-emerald-400 font-bold">{user.sms_bucks} SMS Bucks</p>
-                            <p className="text-slate-400 text-sm capitalize">{user.membership_tier}</p>
-                          </div>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Selected User Management */}
-            {selectedUser && (
-              <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
-                <h2 className="text-2xl font-bold text-white mb-4">
-                  Manage: {selectedUser.username}
-                </h2>
-
-                {/* User Info */}
-                <div className="bg-slate-800 rounded-lg p-4 mb-6">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-slate-400 text-sm">Email</p>
-                      <p className="text-white font-medium">{selectedUser.email}</p>
-                    </div>
-                    <div>
-                      <p className="text-slate-400 text-sm">Current Balance</p>
-                      <p className="text-emerald-400 text-xl font-bold">{selectedUser.sms_bucks} SMS Bucks</p>
-                    </div>
-                    <div>
-                      <p className="text-slate-400 text-sm">Membership Tier</p>
-                      <p className="text-white font-medium capitalize">{selectedUser.membership_tier}</p>
-                    </div>
-                    <div>
-                      <p className="text-slate-400 text-sm">User ID</p>
-                      <p className="text-white font-medium">#{selectedUser.id}</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Adjust Balance Form */}
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-slate-300 mb-2 font-medium">Amount (use negative for deduction)</label>
-                    <input
-                      type="number"
-                      value={adjustAmount}
-                      onChange={(e) => setAdjustAmount(e.target.value)}
-                      placeholder="e.g., 100 or -50"
-                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-emerald-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-slate-300 mb-2 font-medium">Transaction Type</label>
-                    <select
-                      value={transactionType}
-                      onChange={(e) => setTransactionType(e.target.value)}
-                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-emerald-500"
-                    >
-                      <option value="admin_adjustment">Admin Adjustment</option>
-                      <option value="bonus">Bonus</option>
-                      <option value="correction">Correction</option>
-                      <option value="compensation">Compensation</option>
-                      <option value="refund">Refund</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-slate-300 mb-2 font-medium">Description (optional)</label>
-                    <input
-                      type="text"
-                      value={description}
-                      onChange={(e) => setDescription(e.target.value)}
-                      placeholder="Reason for adjustment..."
-                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-emerald-500"
-                    />
-                  </div>
-
-                  <button
-                    onClick={handleAdjustBucks}
-                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3 rounded-lg transition"
-                  >
-                    Adjust Balance
-                  </button>
-
-                  {adjustMessage && (
-                    <div className={`p-3 rounded-lg text-sm font-medium ${adjustMessage.includes('✅')
-                        ? 'bg-green-900/20 border border-green-500/30 text-green-400'
-                        : 'bg-red-900/20 border border-red-500/30 text-red-400'
-                      }`}>
-                      {adjustMessage}
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
           </div>
         )}
 
@@ -752,10 +655,10 @@ export default function AdminPage() {
                             <td className="px-6 py-4 text-slate-300 text-sm">{member.email}</td>
                             <td className="px-6 py-4 text-center">
                               <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${member.membership_tier === 'vip'
-                                  ? 'bg-purple-900 text-purple-200'
-                                  : member.membership_tier === 'premium'
-                                    ? 'bg-emerald-900 text-emerald-200'
-                                    : 'bg-slate-700 text-slate-300'
+                                ? 'bg-purple-900 text-purple-200'
+                                : member.membership_tier === 'premium'
+                                  ? 'bg-emerald-900 text-emerald-200'
+                                  : 'bg-slate-700 text-slate-300'
                                 }`}>
                                 {member.membership_tier.toUpperCase()}
                               </span>
@@ -768,8 +671,8 @@ export default function AdminPage() {
                             </td>
                             <td className="px-6 py-4 text-center">
                               <span className={`font-semibold ${winRate >= 60 ? 'text-green-400' :
-                                  winRate >= 40 ? 'text-yellow-400' :
-                                    'text-red-400'
+                                winRate >= 40 ? 'text-yellow-400' :
+                                  'text-red-400'
                                 }`}>
                                 {winRate}%
                               </span>
@@ -779,10 +682,10 @@ export default function AdminPage() {
                             </td>
                             <td className="px-6 py-4 text-center">
                               <button
-                                onClick={() => router.push(`/profile/${member.username}`)}
-                                className="text-emerald-400 hover:text-emerald-300 font-medium text-sm"
+                                onClick={() => handleViewMember(member)}
+                                className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition"
                               >
-                                View Profile →
+                                Manage
                               </button>
                             </td>
                           </tr>
@@ -802,8 +705,8 @@ export default function AdminPage() {
                     onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                     disabled={currentPage === 1}
                     className={`px-4 py-2 rounded-lg font-medium transition ${currentPage === 1
-                        ? 'bg-slate-800 text-slate-600 cursor-not-allowed'
-                        : 'bg-slate-800 text-white hover:bg-slate-700'
+                      ? 'bg-slate-800 text-slate-600 cursor-not-allowed'
+                      : 'bg-slate-800 text-white hover:bg-slate-700'
                       }`}
                   >
                     ← Previous
@@ -818,8 +721,8 @@ export default function AdminPage() {
                     onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                     disabled={currentPage === totalPages}
                     className={`px-4 py-2 rounded-lg font-medium transition ${currentPage === totalPages
-                        ? 'bg-slate-800 text-slate-600 cursor-not-allowed'
-                        : 'bg-slate-800 text-white hover:bg-slate-700'
+                      ? 'bg-slate-800 text-slate-600 cursor-not-allowed'
+                      : 'bg-slate-800 text-white hover:bg-slate-700'
                       }`}
                   >
                     Next →
@@ -827,7 +730,206 @@ export default function AdminPage() {
                 </div>
               </div>
             )}
+            {/* User Detail Modal */}
+            {selectedMember && memberDetails && (
+              <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                <div className="bg-slate-900 border border-slate-700 rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
 
+                  {/* Modal Header */}
+                  <div className="sticky top-0 bg-slate-900 border-b border-slate-700 p-6 flex justify-between items-center">
+                    <div>
+                      <h2 className="text-2xl font-bold text-white">
+                        {memberDetails.user.display_name || memberDetails.user.username}
+                      </h2>
+                      <p className="text-slate-400">@{memberDetails.user.username}</p>
+                    </div>
+                    <button
+                      onClick={handleCloseModal}
+                      className="text-slate-400 hover:text-white text-2xl"
+                    >
+                      ✕
+                    </button>
+                  </div>
+
+                  {/* Modal Content */}
+                  <div className="p-6 space-y-6">
+
+                    {/* User Info Cards */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="bg-slate-800 rounded-lg p-4">
+                        <p className="text-slate-400 text-sm mb-1">Membership Tier</p>
+                        <p className={`text-lg font-bold ${memberDetails.user.membership_tier === 'vip' ? 'text-purple-400' :
+                          memberDetails.user.membership_tier === 'premium' ? 'text-emerald-400' :
+                            'text-slate-300'
+                          }`}>
+                          {memberDetails.user.membership_tier.toUpperCase()}
+                        </p>
+                      </div>
+                      <div className="bg-slate-800 rounded-lg p-4">
+                        <p className="text-slate-400 text-sm mb-1">SMS Bucks</p>
+                        <p className="text-emerald-400 text-lg font-bold">{memberDetails.user.sms_bucks}</p>
+                      </div>
+                      <div className="bg-slate-800 rounded-lg p-4">
+                        <p className="text-slate-400 text-sm mb-1">Member Since</p>
+                        <p className="text-white text-lg font-bold">
+                          {new Date(memberDetails.user.created_at).toLocaleDateString()}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Stats */}
+                    <div className="bg-slate-800 rounded-lg p-4">
+                      <h3 className="text-white font-semibold mb-3">Parlay Statistics</h3>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div>
+                          <p className="text-slate-400 text-sm">Total Parlays</p>
+                          <p className="text-white text-xl font-bold">{memberDetails.stats.total_parlays}</p>
+                        </div>
+                        <div>
+                          <p className="text-slate-400 text-sm">Wins</p>
+                          <p className="text-green-400 text-xl font-bold">{memberDetails.stats.total_wins}</p>
+                        </div>
+                        <div>
+                          <p className="text-slate-400 text-sm">Losses</p>
+                          <p className="text-red-400 text-xl font-bold">{memberDetails.stats.total_losses}</p>
+                        </div>
+                        <div>
+                          <p className="text-slate-400 text-sm">Win Rate</p>
+                          <p className="text-white text-xl font-bold">{memberDetails.stats.win_rate}%</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Action Message */}
+                    {actionMessage && (
+                      <div className={`p-4 rounded-lg text-sm font-medium ${actionMessage.includes('✅')
+                        ? 'bg-green-900/20 border border-green-500/30 text-green-400'
+                        : 'bg-red-900/20 border border-red-500/30 text-red-400'
+                        }`}>
+                        {actionMessage}
+                      </div>
+                    )}
+
+                    {/* Management Actions */}
+                    <div className="space-y-4">
+
+                      {/* Adjust SMS Bucks */}
+                      <div className="bg-slate-800 rounded-lg p-4">
+                        <h3 className="text-white font-semibold mb-3">Adjust SMS Bucks</h3>
+                        <div className="space-y-3">
+                          <input
+                            type="number"
+                            value={adjustBucksAmount}
+                            onChange={(e) => setAdjustBucksAmount(e.target.value)}
+                            placeholder="Amount (use - for deduction)"
+                            className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white"
+                          />
+                          <input
+                            type="text"
+                            value={adjustBucksReason}
+                            onChange={(e) => setAdjustBucksReason(e.target.value)}
+                            placeholder="Reason for adjustment"
+                            className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white"
+                          />
+                          <button
+                            onClick={handleAdjustBucks}
+                            disabled={actionLoading || !adjustBucksAmount}
+                            className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-700 disabled:cursor-not-allowed text-white font-semibold py-2 rounded-lg transition"
+                          >
+                            {actionLoading ? 'Processing...' : 'Adjust Balance'}
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Change Tier */}
+                      <div className="bg-slate-800 rounded-lg p-4">
+                        <h3 className="text-white font-semibold mb-3">Change Membership Tier</h3>
+                        <div className="space-y-3">
+                          <select
+                            value={newTier}
+                            onChange={(e) => setNewTier(e.target.value)}
+                            className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white"
+                          >
+                            <option value="free">Free</option>
+                            <option value="premium">Premium</option>
+                            <option value="vip">VIP</option>
+                          </select>
+                          <button
+                            onClick={handleChangeTier}
+                            disabled={actionLoading || newTier === memberDetails.user.membership_tier}
+                            className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-slate-700 disabled:cursor-not-allowed text-white font-semibold py-2 rounded-lg transition"
+                          >
+                            {actionLoading ? 'Processing...' : 'Change Tier'}
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Add Free Month */}
+                      <div className="bg-slate-800 rounded-lg p-4">
+                        <h3 className="text-white font-semibold mb-3">Add Free Month</h3>
+                        <p className="text-slate-400 text-sm mb-3">
+                          Extends subscription by 30 days from current end date
+                        </p>
+                        <button
+                          onClick={handleAddFreeMonth}
+                          disabled={actionLoading || memberDetails.user.membership_tier === 'free'}
+                          className="w-full bg-purple-600 hover:bg-purple-700 disabled:bg-slate-700 disabled:cursor-not-allowed text-white font-semibold py-2 rounded-lg transition"
+                        >
+                          {actionLoading ? 'Processing...' : 'Add 30 Days'}
+                        </button>
+                      </div>
+
+                      {/* Cancel Membership */}
+                      <div className="bg-slate-800 rounded-lg p-4 border border-red-500/30">
+                        <h3 className="text-red-400 font-semibold mb-3">Danger Zone</h3>
+                        <p className="text-slate-400 text-sm mb-3">
+                          Cancel membership and downgrade user to free tier
+                        </p>
+                        <button
+                          onClick={handleCancelMembership}
+                          disabled={actionLoading || memberDetails.user.membership_tier === 'free'}
+                          className="w-full bg-red-600 hover:bg-red-700 disabled:bg-slate-700 disabled:cursor-not-allowed text-white font-semibold py-2 rounded-lg transition"
+                        >
+                          {actionLoading ? 'Processing...' : 'Cancel Membership'}
+                        </button>
+                      </div>
+
+                    </div>
+
+                    {/* Recent Transactions */}
+                    <div className="bg-slate-800 rounded-lg p-4">
+                      <h3 className="text-white font-semibold mb-3">Recent SMS Bucks Transactions</h3>
+                      {memberDetails.transactions.length === 0 ? (
+                        <p className="text-slate-400 text-sm">No transactions yet</p>
+                      ) : (
+                        <div className="space-y-2 max-h-60 overflow-y-auto">
+                          {memberDetails.transactions.map((tx) => (
+                            <div key={tx.id} className="flex justify-between items-center py-2 border-b border-slate-700 last:border-0">
+                              <div>
+                                <p className="text-white text-sm font-medium">{tx.transaction_type}</p>
+                                <p className="text-slate-400 text-xs">
+                                  {new Date(tx.created_at).toLocaleString()}
+                                </p>
+                                {tx.description && (
+                                  <p className="text-slate-400 text-xs italic">{tx.description}</p>
+                                )}
+                              </div>
+                              <div className="text-right">
+                                <p className={`font-bold ${tx.amount >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                  {tx.amount >= 0 ? '+' : ''}{tx.amount}
+                                </p>
+                                <p className="text-slate-500 text-xs">Balance: {tx.balance_after}</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

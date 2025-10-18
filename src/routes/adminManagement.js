@@ -515,6 +515,7 @@ router.post('/members/:userId/adjust-bucks', async (req, res) => {
 
     res.json({
       success: true,
+      message: `SMS Bucks adjusted successfully. New balance: ${newBalance}`,
       newBalance,
       previousBalance: currentBalance,
       adjustment: amount
