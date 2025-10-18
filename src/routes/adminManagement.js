@@ -331,4 +331,397 @@ router.get('/members', async (req, res) => {
   }
 });
 
+// ==========================================
+// GET /api/admin/management/members/:userId
+// Get detailed user information
+// ==========================================
+router.get('/members/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    // Get user basic info
+    const userResult = await pool.query(
+      `SELECT 
+        u.id,
+        u.username,
+        u.email,
+        u.display_name,
+        u.membership_tier,
+        u.sms_bucks,
+        u.created_at,
+        u.is_active,
+        u.subscription_start_date,
+        u.subscription_end_date,
+        u.last_login_bonus_date,
+        u.avatar_url,
+        u.bio
+      FROM users u
+      WHERE u.id = $1`,
+      [userId]
+    );
+
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found'
+      });
+    }
+
+    // Get user stats
+    const statsResult = await pool.query(
+      `SELECT 
+        COUNT(DISTINCT up.id) as total_parlays,
+        COUNT(DISTINCT CASE WHEN up.is_hit = true THEN up.id END) as total_wins,
+        COUNT(DISTINCT CASE WHEN up.is_hit = false THEN up.id END) as total_losses,
+        COUNT(DISTINCT CASE WHEN up.is_hit IS NULL THEN up.id END) as pending_parlays,
+        COALESCE(
+          ROUND(
+            (COUNT(CASE WHEN up.is_hit = true THEN 1 END)::DECIMAL / 
+            NULLIF(COUNT(CASE WHEN up.is_hit IS NOT NULL THEN 1 END), 0)) * 100, 
+            2
+          ), 
+          0
+        ) as win_rate
+      FROM user_parlays up
+      WHERE up.user_id = $1`,
+      [userId]
+    );
+
+    // Get SMS Bucks transactions (last 50)
+    const transactionsResult = await pool.query(
+      `SELECT 
+        id,
+        amount,
+        transaction_type,
+        balance_after,
+        description,
+        created_at
+      FROM sms_bucks_transactions
+      WHERE user_id = $1
+      ORDER BY created_at DESC
+      LIMIT 50`,
+      [userId]
+    );
+
+    // Get recent parlays (last 20)
+    const parlaysResult = await pool.query(
+      `SELECT 
+        id,
+        parlay_name,
+        season,
+        week,
+        leg_count,
+        games,
+        combined_ai_probability,
+        risk_level,
+        sms_bucks_cost,
+        is_hit,
+        legs_hit,
+        created_at,
+        resolved_at
+      FROM user_parlays
+      WHERE user_id = $1
+      ORDER BY created_at DESC
+      LIMIT 20`,
+      [userId]
+    );
+
+    res.json({
+      success: true,
+      user: userResult.rows[0],
+      stats: statsResult.rows[0],
+      transactions: transactionsResult.rows,
+      recentParlays: parlaysResult.rows
+    });
+
+  } catch (error) {
+    console.error('Get user details error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get user details'
+    });
+  }
+});
+
+// ==========================================
+// POST /api/admin/management/members/:userId/adjust-bucks
+// Adjust user's SMS Bucks balance
+// ==========================================
+router.post('/members/:userId/adjust-bucks', async (req, res) => {
+  const client = await pool.connect();
+  
+  try {
+    const { userId } = req.params;
+    const { amount, reason } = req.body;
+
+    // Validate input
+    if (!amount || amount === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Amount must be non-zero'
+      });
+    }
+
+    if (!reason || reason.trim() === '') {
+      return res.status(400).json({
+        success: false,
+        error: 'Reason is required'
+      });
+    }
+
+    await client.query('BEGIN');
+
+    // Get current balance
+    const userResult = await client.query(
+      'SELECT sms_bucks FROM users WHERE id = $1',
+      [userId]
+    );
+
+    if (userResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({
+        success: false,
+        error: 'User not found'
+      });
+    }
+
+    const currentBalance = userResult.rows[0].sms_bucks;
+    const newBalance = currentBalance + amount;
+
+    // Don't allow negative balance
+    if (newBalance < 0) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({
+        success: false,
+        error: 'Cannot set negative SMS Bucks balance'
+      });
+    }
+
+    // Update balance
+    await client.query(
+      'UPDATE users SET sms_bucks = $1 WHERE id = $2',
+      [newBalance, userId]
+    );
+
+    // Record transaction
+    await client.query(
+      `INSERT INTO sms_bucks_transactions 
+       (user_id, amount, transaction_type, balance_after, description)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [userId, amount, 'admin_adjustment', newBalance, `Admin: ${reason}`]
+    );
+
+    await client.query('COMMIT');
+
+    res.json({
+      success: true,
+      newBalance,
+      previousBalance: currentBalance,
+      adjustment: amount
+    });
+
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Adjust SMS Bucks error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to adjust SMS Bucks'
+    });
+  } finally {
+    client.release();
+  }
+});
+
+// ==========================================
+// POST /api/admin/management/members/:userId/change-tier
+// Change user's membership tier
+// ==========================================
+router.post('/members/:userId/change-tier', async (req, res) => {
+  const client = await pool.connect();
+  
+  try {
+    const { userId } = req.params;
+    const { tier } = req.body;
+
+    // Validate tier
+    const validTiers = ['free', 'premium', 'vip'];
+    if (!validTiers.includes(tier)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid tier. Must be free, premium, or vip'
+      });
+    }
+
+    await client.query('BEGIN');
+
+    // Get current tier
+    const userResult = await client.query(
+      'SELECT membership_tier FROM users WHERE id = $1',
+      [userId]
+    );
+
+    if (userResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({
+        success: false,
+        error: 'User not found'
+      });
+    }
+
+    const oldTier = userResult.rows[0].membership_tier;
+
+    // Update tier
+    await client.query(
+      'UPDATE users SET membership_tier = $1 WHERE id = $2',
+      [tier, userId]
+    );
+
+    // If upgrading to premium or vip, set subscription dates
+    if (tier === 'premium' || tier === 'vip') {
+      const now = new Date();
+      const endDate = new Date(now);
+      endDate.setMonth(endDate.getMonth() + 1);
+
+      await client.query(
+        `UPDATE users 
+         SET subscription_start_date = $1, subscription_end_date = $2 
+         WHERE id = $3`,
+        [now, endDate, userId]
+      );
+    }
+
+    // If downgrading to free, clear subscription dates
+    if (tier === 'free') {
+      await client.query(
+        `UPDATE users 
+         SET subscription_start_date = NULL, subscription_end_date = NULL 
+         WHERE id = $1`,
+        [userId]
+      );
+    }
+
+    await client.query('COMMIT');
+
+    res.json({
+      success: true,
+      oldTier,
+      newTier: tier,
+      message: `Tier changed from ${oldTier} to ${tier}`
+    });
+
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Change tier error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to change tier'
+    });
+  } finally {
+    client.release();
+  }
+});
+
+// ==========================================
+// POST /api/admin/management/members/:userId/add-free-month
+// Add one free month to subscription
+// ==========================================
+router.post('/members/:userId/add-free-month', async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    // Get current subscription
+    const userResult = await pool.query(
+      `SELECT membership_tier, subscription_end_date 
+       FROM users WHERE id = $1`,
+      [userId]
+    );
+
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found'
+      });
+    }
+
+    const { membership_tier, subscription_end_date } = userResult.rows[0];
+
+    // Only works for premium/vip
+    if (membership_tier === 'free') {
+      return res.status(400).json({
+        success: false,
+        error: 'Cannot add free month to free tier users'
+      });
+    }
+
+    // Calculate new end date (add 30 days)
+    let newEndDate;
+    if (subscription_end_date) {
+      newEndDate = new Date(subscription_end_date);
+    } else {
+      newEndDate = new Date();
+    }
+    newEndDate.setDate(newEndDate.getDate() + 30);
+
+    // Update subscription
+    await pool.query(
+      'UPDATE users SET subscription_end_date = $1 WHERE id = $2',
+      [newEndDate, userId]
+    );
+
+    res.json({
+      success: true,
+      newEndDate,
+      message: 'Added 30 days to subscription'
+    });
+
+  } catch (error) {
+    console.error('Add free month error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to add free month'
+    });
+  }
+});
+
+// ==========================================
+// POST /api/admin/management/members/:userId/cancel-membership
+// Cancel user's membership
+// ==========================================
+router.post('/members/:userId/cancel-membership', async (req, res) => {
+  const client = await pool.connect();
+  
+  try {
+    const { userId } = req.params;
+
+    await client.query('BEGIN');
+
+    // Downgrade to free tier
+    await client.query(
+      `UPDATE users 
+       SET membership_tier = 'free',
+           subscription_start_date = NULL,
+           subscription_end_date = NULL
+       WHERE id = $1`,
+      [userId]
+    );
+
+    await client.query('COMMIT');
+
+    res.json({
+      success: true,
+      message: 'Membership cancelled, user downgraded to free tier'
+    });
+
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Cancel membership error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to cancel membership'
+    });
+  } finally {
+    client.release();
+  }
+});
+
 export default router;
