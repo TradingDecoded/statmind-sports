@@ -22,7 +22,7 @@ export default function AdminPage() {
   const [selectedMember, setSelectedMember] = useState(null);
   const [memberDetails, setMemberDetails] = useState(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
-
+  
   // User management action states
   const [adjustBucksAmount, setAdjustBucksAmount] = useState('');
   const [adjustBucksReason, setAdjustBucksReason] = useState('');
@@ -182,243 +182,6 @@ export default function AdminPage() {
 
   // Adjust SMS Bucks
   const handleAdjustBucks = async () => {
-    if (!adjustBucksAmount || adjustBucksAmount === '0') {
-      setActionMessage('❌ Please enter a non-zero amount');
-      return;
-    }
-
-    if (!adjustBucksReason.trim()) {
-      setActionMessage('❌ Please provide a reason');
-      return;
-    }
-
-    setActionLoading(true);
-    const token = localStorage.getItem('authToken');
-
-    try {
-      const response = await fetch(`/api/admin/management/members/${selectedMember.id}/adjust-bucks`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          amount: parseInt(adjustBucksAmount),
-          reason: adjustBucksReason
-        })
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        setActionMessage(`✅ SMS Bucks adjusted! New balance: ${data.newBalance}`);
-        setAdjustBucksAmount('');
-        setAdjustBucksReason('');
-        // Refresh user details
-        fetchUserDetails(selectedMember.id);
-        // Refresh members list
-        fetchMembers();
-      } else {
-        setActionMessage(`❌ ${data.error}`);
-      }
-    } catch (error) {
-      setActionMessage('❌ Failed to adjust SMS Bucks');
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  // Change membership tier
-  const handleChangeTier = async () => {
-    if (newTier === memberDetails.user.membership_tier) {
-      setActionMessage('⚠️ User already has this tier');
-      return;
-    }
-
-    setActionLoading(true);
-    const token = localStorage.getItem('authToken');
-
-    try {
-      const response = await fetch(`/api/admin/management/members/${selectedMember.id}/change-tier`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ tier: newTier })
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        setActionMessage(`✅ ${data.message}`);
-        // Refresh user details
-        fetchUserDetails(selectedMember.id);
-        // Refresh members list
-        fetchMembers();
-      } else {
-        setActionMessage(`❌ ${data.error}`);
-      }
-    } catch (error) {
-      setActionMessage('❌ Failed to change tier');
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  // Add free month
-  const handleAddFreeMonth = async () => {
-    if (memberDetails.user.membership_tier === 'free') {
-      setActionMessage('❌ Cannot add free month to free tier users');
-      return;
-    }
-
-    setActionLoading(true);
-    const token = localStorage.getItem('authToken');
-
-    try {
-      const response = await fetch(`/api/admin/management/members/${selectedMember.id}/add-free-month`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        setActionMessage(`✅ ${data.message}`);
-        // Refresh user details
-        fetchUserDetails(selectedMember.id);
-      } else {
-        setActionMessage(`❌ ${data.error}`);
-      }
-    } catch (error) {
-      setActionMessage('❌ Failed to add free month');
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  // Cancel membership
-  const handleCancelMembership = async () => {
-    if (!confirm('Are you sure you want to cancel this membership? User will be downgraded to free tier.')) {
-      return;
-    }
-
-    setActionLoading(true);
-    const token = localStorage.getItem('authToken');
-
-    try {
-      const response = await fetch(`/api/admin/management/members/${selectedMember.id}/cancel-membership`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        setActionMessage(`✅ ${data.message}`);
-        // Refresh user details
-        fetchUserDetails(selectedMember.id);
-        // Refresh members list
-        fetchMembers();
-      } else {
-        setActionMessage(`❌ ${data.error}`);
-      }
-    } catch (error) {
-      setActionMessage('❌ Failed to cancel membership');
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  // Trigger fetch when filter/search/page changes
-  useEffect(() => {
-    if (activeTab === 'members') {
-      fetchMembers();
-    }
-  }, [memberFilter, memberSearch, currentPage, activeTab]);
-
-  // Calculate total percentage
-  const totalPercentage = Object.values(weights).reduce((sum, val) => sum + val, 0);
-
-  // Save weights
-  const handleSaveWeights = async () => {
-    if (Math.abs(totalPercentage - 100) > 0.1) {
-      setSaveMessage('⚠️ Weights must total 100%');
-      return;
-    }
-
-    const token = localStorage.getItem('authToken');
-
-    const weightsDecimal = {};
-    Object.entries(weights).forEach(([key, value]) => {
-      weightsDecimal[key] = value / 100;
-    });
-
-    try {
-      const response = await fetch('/api/admin/weights', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ weights: weightsDecimal }),
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        setSaveMessage('✅ Weights saved successfully!');
-        setTimeout(() => setSaveMessage(''), 3000);
-      } else {
-        setSaveMessage(`❌ ${data.error}`);
-      }
-    } catch (error) {
-      setSaveMessage('❌ Failed to save weights');
-    }
-  };
-
-  // Search users
-  const handleSearchUsers = async (query) => {
-    setSearchQuery(query);
-
-    if (query.length < 2) {
-      setSearchResults([]);
-      return;
-    }
-
-    const token = localStorage.getItem('authToken');
-
-    try {
-      const response = await fetch(`/api/admin/management/users/search?query=${encodeURIComponent(query)}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        setSearchResults(data.users);
-      }
-    } catch (error) {
-      console.error('Search failed:', error);
-    }
-  };
-
-  // Select user for management
-  const handleSelectUser = async (user) => {
-    setSelectedUser(user);
-    setSearchResults([]);
-    setSearchQuery('');
-  };
-
-  // Adjust SMS Bucks
-  const handleAdjustBucks = async () => {
     if (!selectedUser || !adjustAmount) {
       setAdjustMessage('⚠️ Please enter an amount');
       return;
@@ -462,6 +225,108 @@ export default function AdminPage() {
     }
   };
 
+  // Change membership tier
+  const handleChangeTier = async () => {
+    if (newTier === memberDetails.user.membership_tier) {
+      setActionMessage('⚠️ User already has this tier');
+      return;
+    }
+
+    setActionLoading(true);
+    const token = localStorage.getItem('authToken');
+
+    try {
+      const response = await fetch(`/api/admin/management/members/${selectedMember.id}/change-tier`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ tier: newTier })
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setActionMessage(`✅ ${data.message}`);
+        fetchUserDetails(selectedMember.id);
+        fetchMembers();
+      } else {
+        setActionMessage(`❌ ${data.error}`);
+      }
+    } catch (error) {
+      setActionMessage('❌ Failed to change tier');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Add free month
+  const handleAddFreeMonth = async () => {
+    if (memberDetails.user.membership_tier === 'free') {
+      setActionMessage('❌ Cannot add free month to free tier users');
+      return;
+    }
+
+    setActionLoading(true);
+    const token = localStorage.getItem('authToken');
+
+    try {
+      const response = await fetch(`/api/admin/management/members/${selectedMember.id}/add-free-month`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setActionMessage(`✅ ${data.message}`);
+        fetchUserDetails(selectedMember.id);
+      } else {
+        setActionMessage(`❌ ${data.error}`);
+      }
+    } catch (error) {
+      setActionMessage('❌ Failed to add free month');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Cancel membership
+  const handleCancelMembership = async () => {
+    if (!confirm('Are you sure you want to cancel this membership? User will be downgraded to free tier.')) {
+      return;
+    }
+
+    setActionLoading(true);
+    const token = localStorage.getItem('authToken');
+
+    try {
+      const response = await fetch(`/api/admin/management/members/${selectedMember.id}/cancel-membership`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setActionMessage(`✅ ${data.message}`);
+        fetchUserDetails(selectedMember.id);
+        fetchMembers();
+      } else {
+        setActionMessage(`❌ ${data.error}`);
+      }
+    } catch (error) {
+      setActionMessage('❌ Failed to cancel membership');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   // Show loading state
   if (isLoading) {
     return (
@@ -497,8 +362,8 @@ export default function AdminPage() {
           <button
             onClick={() => setActiveTab('weights')}
             className={`px-6 py-3 font-medium transition-all ${activeTab === 'weights'
-              ? 'text-emerald-400 border-b-2 border-emerald-400'
-              : 'text-slate-400 hover:text-white'
+                ? 'text-emerald-400 border-b-2 border-emerald-400'
+                : 'text-slate-400 hover:text-white'
               }`}
           >
             ⚙️ Prediction Weights
@@ -506,8 +371,8 @@ export default function AdminPage() {
           <button
             onClick={() => setActiveTab('smsbucks')}
             className={`px-6 py-3 font-medium transition-all ${activeTab === 'smsbucks'
-              ? 'text-emerald-400 border-b-2 border-emerald-400'
-              : 'text-slate-400 hover:text-white'
+                ? 'text-emerald-400 border-b-2 border-emerald-400'
+                : 'text-slate-400 hover:text-white'
               }`}
           >
             💰 SMS Bucks Management
@@ -515,8 +380,8 @@ export default function AdminPage() {
           <button
             onClick={() => setActiveTab('members')}
             className={`px-6 py-3 font-medium transition-all ${activeTab === 'members'
-              ? 'text-emerald-400 border-b-2 border-emerald-400'
-              : 'text-slate-400 hover:text-white'
+                ? 'text-emerald-400 border-b-2 border-emerald-400'
+                : 'text-slate-400 hover:text-white'
               }`}
           >
             👥 Members
@@ -627,7 +492,7 @@ export default function AdminPage() {
               <div className="flex justify-between items-center">
                 <span className="text-lg font-semibold text-white">Total Weight:</span>
                 <span className={`text-2xl font-bold ${Math.abs(totalPercentage - 100) < 0.1 ?
-                  'text-emerald-400' : 'text-red-400'
+                    'text-emerald-400' : 'text-red-400'
                   }`}>
                   {totalPercentage.toFixed(1)}%
                 </span>
@@ -776,8 +641,8 @@ export default function AdminPage() {
 
                   {adjustMessage && (
                     <div className={`p-3 rounded-lg text-sm font-medium ${adjustMessage.includes('✅')
-                      ? 'bg-green-900/20 border border-green-500/30 text-green-400'
-                      : 'bg-red-900/20 border border-red-500/30 text-red-400'
+                        ? 'bg-green-900/20 border border-green-500/30 text-green-400'
+                        : 'bg-red-900/20 border border-red-500/30 text-red-400'
                       }`}>
                       {adjustMessage}
                     </div>
@@ -887,10 +752,10 @@ export default function AdminPage() {
                             <td className="px-6 py-4 text-slate-300 text-sm">{member.email}</td>
                             <td className="px-6 py-4 text-center">
                               <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${member.membership_tier === 'vip'
-                                ? 'bg-purple-900 text-purple-200'
-                                : member.membership_tier === 'premium'
-                                  ? 'bg-emerald-900 text-emerald-200'
-                                  : 'bg-slate-700 text-slate-300'
+                                  ? 'bg-purple-900 text-purple-200'
+                                  : member.membership_tier === 'premium'
+                                    ? 'bg-emerald-900 text-emerald-200'
+                                    : 'bg-slate-700 text-slate-300'
                                 }`}>
                                 {member.membership_tier.toUpperCase()}
                               </span>
@@ -903,8 +768,8 @@ export default function AdminPage() {
                             </td>
                             <td className="px-6 py-4 text-center">
                               <span className={`font-semibold ${winRate >= 60 ? 'text-green-400' :
-                                winRate >= 40 ? 'text-yellow-400' :
-                                  'text-red-400'
+                                  winRate >= 40 ? 'text-yellow-400' :
+                                    'text-red-400'
                                 }`}>
                                 {winRate}%
                               </span>
@@ -914,59 +779,58 @@ export default function AdminPage() {
                             </td>
                             <td className="px-6 py-4 text-center">
                               <button
-                                onClick={() => handleViewMember(member)}
-                                className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition"
+                                onClick={() => router.push(`/profile/${member.username}`)}
+                                className="text-emerald-400 hover:text-emerald-300 font-medium text-sm"
                               >
-                                Manage
+                                View Profile →
                               </button>
                             </td>
-                          </td>
                           </tr>
-                    );
+                        );
                       })}
-                  </tbody>
-                </table>
+                    </tbody>
+                  </table>
                 </div>
               )}
-          </div>
+            </div>
 
             {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-            <div className="flex justify-between items-center">
-              <button
-                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-                className={`px-4 py-2 rounded-lg font-medium transition ${currentPage === 1
-                  ? 'bg-slate-800 text-slate-600 cursor-not-allowed'
-                  : 'bg-slate-800 text-white hover:bg-slate-700'
-                  }`}
-              >
-                ← Previous
-              </button>
+            {totalPages > 1 && (
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+                <div className="flex justify-between items-center">
+                  <button
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    className={`px-4 py-2 rounded-lg font-medium transition ${currentPage === 1
+                        ? 'bg-slate-800 text-slate-600 cursor-not-allowed'
+                        : 'bg-slate-800 text-white hover:bg-slate-700'
+                      }`}
+                  >
+                    ← Previous
+                  </button>
 
-              <span className="text-slate-400">
-                Page <span className="text-white font-semibold">{currentPage}</span> of{' '}
-                <span className="text-white font-semibold">{totalPages}</span>
-              </span>
+                  <span className="text-slate-400">
+                    Page <span className="text-white font-semibold">{currentPage}</span> of{' '}
+                    <span className="text-white font-semibold">{totalPages}</span>
+                  </span>
 
-              <button
-                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                disabled={currentPage === totalPages}
-                className={`px-4 py-2 rounded-lg font-medium transition ${currentPage === totalPages
-                  ? 'bg-slate-800 text-slate-600 cursor-not-allowed'
-                  : 'bg-slate-800 text-white hover:bg-slate-700'
-                  }`}
-              >
-                Next →
-              </button>
-            </div>
+                  <button
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                    className={`px-4 py-2 rounded-lg font-medium transition ${currentPage === totalPages
+                        ? 'bg-slate-800 text-slate-600 cursor-not-allowed'
+                        : 'bg-slate-800 text-white hover:bg-slate-700'
+                      }`}
+                  >
+                    Next →
+                  </button>
+                </div>
+              </div>
+            )}
+
           </div>
         )}
-
       </div>
-        )}
     </div>
-    </div >
   );
 }
