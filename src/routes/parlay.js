@@ -19,37 +19,46 @@ router.get('/available-games', requireAuth, async (req, res) => {
   try {
     const { season, week } = req.query;
 
-    // Calculate current week dynamically
-const now = new Date();
-const currentYear = now.getFullYear();
-const currentMonth = now.getMonth(); // 0-11
+    // Calculate current week dynamically based on actual 2025 NFL schedule
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth(); // 0-11
 
-// NFL season logic: September (8) through February (1)
-let calculatedSeason = currentMonth >= 8 ? currentYear : currentYear;
-let calculatedWeek = 7; // Default fallback
+    // Determine season
+    let calculatedSeason = currentMonth >= 8 ? currentYear : currentYear;
 
-// Simple week calculation (you can refine this)
-if (currentMonth === 9) { // October
-  const day = now.getDate();
-  calculatedWeek = Math.ceil((day + 7) / 7); // Rough estimate
-}
+    // NFL 2025 Season Start: September 4, 2025
+    // Calculate week based on days since season start
+    const seasonStartDate = new Date(2025, 8, 4); // Sept 4, 2025 (month is 0-indexed)
+    const daysSinceStart = Math.floor((now - seasonStartDate) / (1000 * 60 * 60 * 24));
+    const weeksSinceStart = Math.floor(daysSinceStart / 7);
+    let calculatedWeek = weeksSinceStart + 1; // Week 1 starts on day 0
 
-const currentSeason = season ? parseInt(season) : calculatedSeason;
-const currentWeek = week ? parseInt(week) : calculatedWeek;
+    // Ensure week is in valid range (1-18 for regular season)
+    if (calculatedWeek < 1) calculatedWeek = 1;
+    if (calculatedWeek > 18) calculatedWeek = 18;
 
-// Get all games for the week
-const allGames = await parlayService.getAvailableGames(currentSeason, currentWeek);
+    console.log(`📅 Current date: ${now.toISOString()}`);
+    console.log(`📅 Season start: ${seasonStartDate.toISOString()}`);
+    console.log(`📅 Days since start: ${daysSinceStart}`);
+    console.log(`📅 Calculated week: ${calculatedWeek}`);
 
-// Filter out completed games - only show upcoming
-const upcomingGames = allGames.filter(game => !game.is_final);
+    const currentSeason = season ? parseInt(season) : calculatedSeason;
+    const currentWeek = week ? parseInt(week) : calculatedWeek;
 
-res.json({
-  success: true,
-  games: upcomingGames,
-  count: upcomingGames.length,
-  week: currentWeek,
-  season: currentSeason
-});
+    // Get all games for the week
+    const allGames = await parlayService.getAvailableGames(currentSeason, currentWeek);
+
+    // Filter out completed games - only show upcoming
+    const upcomingGames = allGames.filter(game => !game.is_final);
+
+    res.json({
+      success: true,
+      games: upcomingGames,
+      count: upcomingGames.length,
+      week: currentWeek,
+      season: currentSeason
+    });
 
   } catch (error) {
     console.error('Get available games error:', error);
@@ -207,34 +216,34 @@ router.delete('/:id', requireAuth, async (req, res) => {
   try {
     const parlayId = req.params.id;
     const userId = req.user.id;
-    
+
     console.log(`🗑️  Delete request for parlay ${parlayId} by user ${userId}`);
-    
+
     // Make sure parlay belongs to this user
     const checkResult = await pool.query(
       'SELECT user_id, is_hit FROM user_parlays WHERE id = $1',
       [parlayId]
     );
-    
+
     if (checkResult.rows.length === 0) {
       return res.status(404).json({
         success: false,
         error: 'Parlay not found'
       });
     }
-    
+
     if (checkResult.rows[0].user_id !== userId) {
       return res.status(403).json({
         success: false,
         error: 'Not authorized to delete this parlay'
       });
     }
-    
+
     const parlayStatus = checkResult.rows[0].is_hit;
-    
+
     // Delete the parlay
     await pool.query('DELETE FROM user_parlays WHERE id = $1', [parlayId]);
-    
+
     // Update user stats based on parlay status
     if (parlayStatus === null) {
       // Was pending
@@ -264,7 +273,7 @@ router.delete('/:id', requireAuth, async (req, res) => {
         [userId]
       );
     }
-    
+
     // Recalculate win rate
     await pool.query(
       `UPDATE user_stats 
@@ -276,14 +285,14 @@ router.delete('/:id', requireAuth, async (req, res) => {
        WHERE user_id = $1`,
       [userId]
     );
-    
+
     console.log(`✅ Deleted parlay ${parlayId} for user ${userId}`);
-    
+
     res.json({
       success: true,
       message: 'Parlay deleted successfully'
     });
-    
+
   } catch (error) {
     console.error('❌ Delete parlay error:', error);
     res.status(500).json({
