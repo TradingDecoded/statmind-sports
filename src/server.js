@@ -22,6 +22,8 @@ import usersRoutes from './routes/users.js';
 import './jobs/resolveParlays.js';
 import leaderboardRoutes from './routes/leaderboard.js';
 import notificationsRoutes from './routes/notifications.js';
+import smsBucksRoutes from './routes/smsBucks.js';
+import competitionRoutes from './routes/competition.js';
 
 dotenv.config();
 const app = express();
@@ -144,6 +146,8 @@ app.use('/api/parlay', parlayRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/leaderboard', leaderboardRoutes);
 app.use('/api/notifications', notificationsRoutes);
+app.use('/api/sms-bucks', smsBucksRoutes);
+app.use('/api/competition', competitionRoutes);
 
 // ======================================
 // Start Server

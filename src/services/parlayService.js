@@ -132,16 +132,75 @@ class ParlayService {
 
   // ==========================================
   // CREATE NEW PARLAY
-  // Saves a user's parlay to the database
+  // Saves a user's parlay to the database with SMS Bucks integration
   // ==========================================
   async createParlay(userId, parlayData) {
-    try {
-      const { parlayName, season, week, games } = parlayData;
+    const client = await pool.connect();
 
-      // Calculate probability
+    try {
+      await client.query('BEGIN');
+
+      const { parlayName, season, week, games } = parlayData;
+      const legCount = games.length;
+
+      // 1. Get user's membership tier and SMS Bucks balance
+      const userResult = await client.query(
+        'SELECT membership_tier, sms_bucks FROM users WHERE id = $1',
+        [userId]
+      );
+
+      if (userResult.rows.length === 0) {
+        throw new Error('User not found');
+      }
+
+      const { membership_tier, sms_bucks } = userResult.rows[0];
+
+      // 2. Check if user is Premium or VIP (Free users can't create parlays)
+      if (membership_tier === 'free') {
+        throw new Error('Premium or VIP membership required to create parlays');
+      }
+
+      // 3. Calculate SMS Bucks cost based on leg count
+      const smsBucksCost = this.calculateParlayCost(legCount);
+
+      // 4. Check if user has enough SMS Bucks
+      if (sms_bucks < smsBucksCost) {
+        throw new Error(`Insufficient SMS Bucks. Need ${smsBucksCost}, have ${sms_bucks}`);
+      }
+
+      // 5. Check weekly parlay limit (max 10 per week)
+      const currentYear = new Date().getFullYear();
+      const currentWeek = this.getWeekNumber(new Date());
+
+      const weeklyCountResult = await client.query(
+        `SELECT parlay_count FROM weekly_parlay_counts 
+         WHERE user_id = $1 AND year = $2 AND week_number = $3`,
+        [userId, currentYear, currentWeek]
+      );
+
+      const currentWeekCount = weeklyCountResult.rows.length > 0
+        ? weeklyCountResult.rows[0].parlay_count
+        : 0;
+
+      if (currentWeekCount >= 10) {
+        throw new Error('Weekly parlay limit reached (10 parlays per week)');
+      }
+
+      // 6. Get active competition ID
+      const competitionResult = await client.query(
+        `SELECT id FROM weekly_competitions 
+         WHERE status = 'active' AND year = $1 AND week_number = $2`,
+        [currentYear, currentWeek]
+      );
+
+      const competitionId = competitionResult.rows.length > 0
+        ? competitionResult.rows[0].id
+        : null;
+
+      // 7. Calculate probability
       const calculation = this.calculateParlayProbability(games);
 
-      // Prepare games data for JSON storage
+      // 8. Prepare games data for JSON storage
       const gamesJson = games.map(game => ({
         game_id: game.game_id,
         home_team: game.home_team,
@@ -151,47 +210,139 @@ class ParlayService {
         ai_probability: game.ai_probability
       }));
 
-      // Insert parlay
-      const result = await pool.query(
+      // 9. Insert parlay with SMS Bucks cost and competition tracking
+      const parlayResult = await client.query(
         `INSERT INTO user_parlays 
         (user_id, parlay_name, season, week, leg_count, games, 
-         combined_ai_probability, risk_level)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+         combined_ai_probability, risk_level, sms_bucks_cost, 
+         year, week_number, competition_id, sport)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
         RETURNING *`,
         [
           userId,
           parlayName,
           season,
           week,
-          games.length,
+          legCount,
           JSON.stringify(gamesJson),
           calculation.combinedProbability,
-          calculation.riskLevel
+          calculation.riskLevel,
+          smsBucksCost,
+          currentYear,
+          currentWeek,
+          competitionId,
+          'nfl'
         ]
       );
 
-      // Update user stats
-      await pool.query(
+      const parlayId = parlayResult.rows[0].id;
+
+      // 10. Deduct SMS Bucks
+      const newBalance = sms_bucks - smsBucksCost;
+      await client.query(
+        'UPDATE users SET sms_bucks = $1 WHERE id = $2',
+        [newBalance, userId]
+      );
+
+      // 11. Record SMS Bucks transaction
+      await client.query(
+        `INSERT INTO sms_bucks_transactions 
+         (user_id, amount, transaction_type, balance_after, description, related_parlay_id)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [userId, -smsBucksCost, 'parlay_entry', newBalance,
+          `Parlay entry: ${parlayName} (${legCount} legs)`, parlayId]
+      );
+
+      // 12. Update weekly parlay count
+      await client.query(
+        `INSERT INTO weekly_parlay_counts (user_id, year, week_number, parlay_count, last_parlay_date)
+         VALUES ($1, $2, $3, 1, NOW())
+         ON CONFLICT (user_id, year, week_number) 
+         DO UPDATE SET parlay_count = weekly_parlay_counts.parlay_count + 1, 
+                       last_parlay_date = NOW()`,
+        [userId, currentYear, currentWeek]
+      );
+
+      // 13. Update or create competition standing
+      if (competitionId) {
+        await client.query(
+          `INSERT INTO weekly_competition_standings (competition_id, user_id, parlays_entered)
+           VALUES ($1, $2, 1)
+           ON CONFLICT (competition_id, user_id) 
+           DO UPDATE SET parlays_entered = weekly_competition_standings.parlays_entered + 1`,
+          [competitionId, userId]
+        );
+
+        // Update competition participant count
+        await client.query(
+          `UPDATE weekly_competitions 
+           SET total_parlays = total_parlays + 1,
+               total_participants = (
+                 SELECT COUNT(DISTINCT user_id) 
+                 FROM weekly_competition_standings 
+                 WHERE competition_id = $1
+               )
+           WHERE id = $1`,
+          [competitionId]
+        );
+      }
+
+      // 14. Update user stats
+      await client.query(
         `UPDATE user_stats 
         SET total_parlays = total_parlays + 1,
             pending_parlays = pending_parlays + 1,
-            total_legs_picked = total_legs_picked + $2
+            total_legs_picked = total_legs_picked + $2,
+            avg_parlay_legs = ROUND(
+              (total_legs_picked + $2)::DECIMAL / (total_parlays + 1), 1
+            )
         WHERE user_id = $1`,
-        [userId, games.length]
+        [userId, legCount]
       );
 
-      console.log(`✅ Parlay created by user ${userId}: ${parlayName}`);
+      await client.query('COMMIT');
+
+      console.log(`✅ Parlay created by user ${userId}: ${parlayName} (Cost: ${smsBucksCost} SMS Bucks)`);
 
       return {
         success: true,
-        parlay: result.rows[0],
-        calculation
+        parlay: parlayResult.rows[0],
+        calculation,
+        smsBucksCost,
+        newBalance,
+        weeklyParlaysRemaining: 10 - (currentWeekCount + 1)
       };
 
     } catch (error) {
+      await client.query('ROLLBACK');
       console.error('Create parlay error:', error);
       throw error;
+    } finally {
+      client.release();
     }
+  }
+
+  // ==========================================
+  // HELPER: Calculate SMS Bucks cost based on leg count
+  // ==========================================
+  calculateParlayCost(legCount) {
+    if (legCount === 2) return 50;
+    if (legCount === 3) return 75;
+    if (legCount === 4) return 100;
+    if (legCount === 5) return 125;
+    if (legCount >= 6) return 150;
+    return 0;
+  }
+
+  // ==========================================
+  // HELPER: Get ISO week number
+  // ==========================================
+  getWeekNumber(date) {
+    const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+    const dayNum = d.getUTCDay() || 7;
+    d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+    return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
   }
 
   // ==========================================
@@ -299,6 +450,86 @@ class ParlayService {
     } catch (error) {
       console.error('Delete parlay error:', error);
       throw error;
+    }
+  }
+
+  // ==========================================
+  // AWARD WIN BONUS
+  // Give SMS Bucks bonus when parlay wins
+  // ==========================================
+  async awardWinBonus(parlayId) {
+    const client = await pool.connect();
+    
+    try {
+      await client.query('BEGIN');
+      
+      // Get parlay and user info
+      const parlayResult = await client.query(
+        `SELECT up.user_id, up.leg_count, up.sms_bucks_reward, u.membership_tier, u.sms_bucks
+         FROM user_parlays up
+         JOIN users u ON up.user_id = u.id
+         WHERE up.id = $1`,
+        [parlayId]
+      );
+      
+      if (parlayResult.rows.length === 0) {
+        throw new Error('Parlay not found');
+      }
+      
+      const { user_id, leg_count, sms_bucks_reward, membership_tier, sms_bucks } = parlayResult.rows[0];
+      
+      // Check if bonus already awarded
+      if (sms_bucks_reward > 0) {
+        console.log(`⚠️ Win bonus already awarded for parlay ${parlayId}`);
+        return { success: false, message: 'Bonus already awarded' };
+      }
+      
+      // Calculate bonus based on tier
+      const bonus = membership_tier === 'vip' ? 50 : membership_tier === 'premium' ? 25 : 0;
+      
+      if (bonus === 0) {
+        console.log(`⚠️ No bonus for free tier user`);
+        return { success: false, message: 'Free users do not receive win bonuses' };
+      }
+      
+      // Update user balance
+      const newBalance = sms_bucks + bonus;
+      await client.query(
+        'UPDATE users SET sms_bucks = $1 WHERE id = $2',
+        [newBalance, user_id]
+      );
+      
+      // Record transaction
+      await client.query(
+        `INSERT INTO sms_bucks_transactions 
+         (user_id, amount, transaction_type, balance_after, description, related_parlay_id)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [user_id, bonus, 'parlay_win', newBalance, 
+         `Parlay win bonus (${leg_count} legs)`, parlayId]
+      );
+      
+      // Update parlay reward record
+      await client.query(
+        'UPDATE user_parlays SET sms_bucks_reward = $1 WHERE id = $2',
+        [bonus, parlayId]
+      );
+      
+      await client.query('COMMIT');
+      
+      console.log(`✅ Win bonus awarded: ${bonus} SMS Bucks to user ${user_id} for parlay ${parlayId}`);
+      
+      return {
+        success: true,
+        bonus,
+        newBalance
+      };
+      
+    } catch (error) {
+      await client.query('ROLLBACK');
+      console.error('Award win bonus error:', error);
+      throw error;
+    } finally {
+      client.release();
     }
   }
 }
