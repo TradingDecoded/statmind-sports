@@ -4,6 +4,7 @@ import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import NotificationBell from './NotificationBell';
+import SMSBucksDisplay from './SMSBucksDisplay';
 
 export default function Navigation() {
   const pathname = usePathname();
@@ -28,7 +29,6 @@ export default function Navigation() {
 
   // User-only links (shown when authenticated)
   const userLinks = user ? [
-    { href: '/my-parlays', label: 'My Parlays' },
     { href: '/parlay-builder', label: 'Create Parlay' },
     { href: '/leaderboard', label: '🏆 Leaderboard' },
   ] : [];
@@ -113,6 +113,9 @@ export default function Navigation() {
             {/* Notification Bell (only when logged in) */}
             {user && <NotificationBell />}
 
+            {/* SMS Bucks Display (only when logged in) */}
+            {user && <SMSBucksDisplay />}
+
             {/* Auth Section */}
             {user ? (
               // User Menu
@@ -138,6 +141,11 @@ export default function Navigation() {
                     <div className="px-4 py-2 border-b border-slate-700">
                       <p className="text-sm font-medium text-white">{user.displayName || user.username}</p>
                       <p className="text-xs text-slate-400">{user.email}</p>
+                      <div className="mt-2">
+                        <span className="inline-block px-2 py-1 rounded text-xs font-semibold uppercase bg-blue-600 text-white">
+                          🏆 PREMIUM
+                        </span>
+                      </div>
                     </div>
                     <Link
                       href={`/profile/${user.username}`}
@@ -145,6 +153,20 @@ export default function Navigation() {
                       onClick={() => setIsUserMenuOpen(false)}
                     >
                       My Profile
+                    </Link>
+                    <Link
+                      href="/my-parlays"
+                      className="block px-4 py-2 text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors"
+                      onClick={() => setIsUserMenuOpen(false)}
+                    >
+                      📊 My Parlays
+                    </Link>
+                    <Link
+                      href="/settings"
+                      className="block px-4 py-2 text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors"
+                      onClick={() => setIsUserMenuOpen(false)}
+                    >
+                      ⚙️ Settings
                     </Link>
                     <button
                       onClick={() => {
@@ -261,10 +283,24 @@ export default function Navigation() {
                     </div>
                     <Link
                       href={`/profile/${user.username}`}
-                      onClick={() => setIsMenuOpen(false)}
-                      className="block px-4 py-3 rounded-lg text-base font-medium text-slate-300 hover:text-white hover:bg-slate-700"
+                      className="block px-4 py-2 text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors"
+                      onClick={() => setIsUserMenuOpen(false)}
                     >
-                      My Profile
+                      👤 Profile
+                    </Link>
+                    <Link
+                      href="/my-parlays"
+                      className="block px-4 py-2 text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors"
+                      onClick={() => setIsUserMenuOpen(false)}
+                    >
+                      📊 My Parlays
+                    </Link>
+                    <Link
+                      href="/settings"
+                      className="block px-4 py-2 text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors"
+                      onClick={() => setIsUserMenuOpen(false)}
+                    >
+                      ⚙️ Settings
                     </Link>
                     <button
                       onClick={() => {
