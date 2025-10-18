@@ -6,6 +6,13 @@ import { useRouter } from 'next/navigation';
 
 export default function LeaderboardPage() {
   const [activeTab, setActiveTab] = useState('overall');
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('tab') === 'weekly') {
+      setActiveTab('weekly');
+    }
+  }, []);
   const [leaderboardData, setLeaderboardData] = useState([]);
   const [myRank, setMyRank] = useState(null);
   const [stats, setStats] = useState(null);

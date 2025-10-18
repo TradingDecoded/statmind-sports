@@ -8,7 +8,16 @@ export default function AdminPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
   const [activeTab, setActiveTab] = useState('weights');
-  
+
+  // Members management state
+  const [members, setMembers] = useState([]);
+  const [memberFilter, setMemberFilter] = useState('all');
+  const [memberSearch, setMemberSearch] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalMembers, setTotalMembers] = useState(0);
+  const [loadingMembers, setLoadingMembers] = useState(false);
+
   // Prediction weights state
   const [weights, setWeights] = useState({
     elo: 20,
@@ -40,6 +49,9 @@ export default function AdminPage() {
       } else {
         // User is admin, fetch weights
         fetchWeights();
+        if (activeTab === 'members') {
+          fetchMembers();
+        }
       }
     }
   }, [user, isLoading, router]);
@@ -47,7 +59,7 @@ export default function AdminPage() {
   // Fetch current weights
   const fetchWeights = async () => {
     const token = localStorage.getItem('authToken');
-    
+
     try {
       const response = await fetch('/api/admin/weights', {
         headers: {
@@ -76,6 +88,51 @@ export default function AdminPage() {
     }));
   };
 
+  // Fetch members list
+  const fetchMembers = async () => {
+    setLoadingMembers(true);
+    const token = localStorage.getItem('authToken');
+
+    try {
+      const params = new URLSearchParams({
+        page: currentPage,
+        limit: 25
+      });
+
+      if (memberFilter !== 'all') {
+        params.append('tier', memberFilter);
+      }
+
+      if (memberSearch) {
+        params.append('search', memberSearch);
+      }
+
+      const response = await fetch(`/api/admin/management/members?${params}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setMembers(data.users);
+        setTotalPages(data.pagination.totalPages);
+        setTotalMembers(data.pagination.totalUsers);
+      }
+    } catch (error) {
+      console.error('Failed to fetch members:', error);
+    } finally {
+      setLoadingMembers(false);
+    }
+  };
+
+  // Trigger fetch when filter/search/page changes
+  useEffect(() => {
+    if (activeTab === 'members') {
+      fetchMembers();
+    }
+  }, [memberFilter, memberSearch, currentPage, activeTab]);
+
   // Calculate total percentage
   const totalPercentage = Object.values(weights).reduce((sum, val) => sum + val, 0);
 
@@ -87,7 +144,7 @@ export default function AdminPage() {
     }
 
     const token = localStorage.getItem('authToken');
-    
+
     const weightsDecimal = {};
     Object.entries(weights).forEach(([key, value]) => {
       weightsDecimal[key] = value / 100;
@@ -119,7 +176,7 @@ export default function AdminPage() {
   // Search users
   const handleSearchUsers = async (query) => {
     setSearchQuery(query);
-    
+
     if (query.length < 2) {
       setSearchResults([]);
       return;
@@ -230,23 +287,30 @@ export default function AdminPage() {
         <div className="flex gap-2 mb-6 border-b border-slate-700">
           <button
             onClick={() => setActiveTab('weights')}
-            className={`px-6 py-3 font-medium transition-all ${
-              activeTab === 'weights'
+            className={`px-6 py-3 font-medium transition-all ${activeTab === 'weights'
                 ? 'text-emerald-400 border-b-2 border-emerald-400'
                 : 'text-slate-400 hover:text-white'
-            }`}
+              }`}
           >
             ⚙️ Prediction Weights
           </button>
           <button
             onClick={() => setActiveTab('smsbucks')}
-            className={`px-6 py-3 font-medium transition-all ${
-              activeTab === 'smsbucks'
+            className={`px-6 py-3 font-medium transition-all ${activeTab === 'smsbucks'
                 ? 'text-emerald-400 border-b-2 border-emerald-400'
                 : 'text-slate-400 hover:text-white'
-            }`}
+              }`}
           >
             💰 SMS Bucks Management
+          </button>
+          <button
+            onClick={() => setActiveTab('members')}
+            className={`px-6 py-3 font-medium transition-all ${activeTab === 'members'
+                ? 'text-emerald-400 border-b-2 border-emerald-400'
+                : 'text-slate-400 hover:text-white'
+              }`}
+          >
+            👥 Members
           </button>
         </div>
 
@@ -353,10 +417,9 @@ export default function AdminPage() {
             <div className="mt-8 p-4 bg-slate-800 rounded-lg border-2 border-slate-700">
               <div className="flex justify-between items-center">
                 <span className="text-lg font-semibold text-white">Total Weight:</span>
-                <span className={`text-2xl font-bold ${
-                  Math.abs(totalPercentage - 100) < 0.1 ?
-                  'text-emerald-400' : 'text-red-400'
-                }`}>
+                <span className={`text-2xl font-bold ${Math.abs(totalPercentage - 100) < 0.1 ?
+                    'text-emerald-400' : 'text-red-400'
+                  }`}>
                   {totalPercentage.toFixed(1)}%
                 </span>
               </div>
@@ -376,7 +439,7 @@ export default function AdminPage() {
               >
                 Save Changes
               </button>
-              
+
               {saveMessage && (
                 <span className="text-sm font-medium">{saveMessage}</span>
               )}
@@ -400,7 +463,7 @@ export default function AdminPage() {
                   placeholder="Search by email or username..."
                   className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-emerald-500"
                 />
-                
+
                 {/* Search Results Dropdown */}
                 {searchResults.length > 0 && (
                   <div className="absolute z-10 w-full mt-2 bg-slate-800 border border-slate-700 rounded-lg shadow-xl max-h-64 overflow-y-auto">
@@ -503,17 +566,194 @@ export default function AdminPage() {
                   </button>
 
                   {adjustMessage && (
-                    <div className={`p-3 rounded-lg text-sm font-medium ${
-                      adjustMessage.includes('✅') 
+                    <div className={`p-3 rounded-lg text-sm font-medium ${adjustMessage.includes('✅')
                         ? 'bg-green-900/20 border border-green-500/30 text-green-400'
                         : 'bg-red-900/20 border border-red-500/30 text-red-400'
-                    }`}>
+                      }`}>
                       {adjustMessage}
                     </div>
                   )}
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {/* ==================== MEMBERS TAB ==================== */}
+        {activeTab === 'members' && (
+          <div className="space-y-6">
+
+            {/* Filters Bar */}
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+                {/* Tier Filter */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-400 mb-2">
+                    Filter by Tier
+                  </label>
+                  <select
+                    value={memberFilter}
+                    onChange={(e) => {
+                      setMemberFilter(e.target.value);
+                      setCurrentPage(1);
+                    }}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-white"
+                  >
+                    <option value="all">All Members</option>
+                    <option value="free">Free Tier</option>
+                    <option value="premium">Premium Tier</option>
+                    <option value="vip">VIP Tier</option>
+                  </select>
+                </div>
+
+                {/* Search */}
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-slate-400 mb-2">
+                    Search Members
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Search by username or email..."
+                    value={memberSearch}
+                    onChange={(e) => {
+                      setMemberSearch(e.target.value);
+                      setCurrentPage(1);
+                    }}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-white placeholder-slate-500"
+                  />
+                </div>
+              </div>
+
+              {/* Stats Summary */}
+              <div className="mt-4 flex gap-4 text-sm">
+                <span className="text-slate-400">
+                  Showing <span className="text-white font-semibold">{members.length}</span> of{' '}
+                  <span className="text-white font-semibold">{totalMembers}</span> members
+                </span>
+              </div>
+            </div>
+
+            {/* Members Table */}
+            <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
+              {loadingMembers ? (
+                <div className="text-center py-12">
+                  <div className="text-slate-400">Loading members...</div>
+                </div>
+              ) : members.length === 0 ? (
+                <div className="text-center py-12">
+                  <div className="text-slate-400">No members found</div>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-slate-800 border-b border-slate-700">
+                      <tr>
+                        <th className="px-6 py-4 text-left text-sm font-semibold text-slate-300">Member</th>
+                        <th className="px-6 py-4 text-left text-sm font-semibold text-slate-300">Email</th>
+                        <th className="px-6 py-4 text-center text-sm font-semibold text-slate-300">Tier</th>
+                        <th className="px-6 py-4 text-center text-sm font-semibold text-slate-300">SMS Bucks</th>
+                        <th className="px-6 py-4 text-center text-sm font-semibold text-slate-300">Parlays</th>
+                        <th className="px-6 py-4 text-center text-sm font-semibold text-slate-300">Win Rate</th>
+                        <th className="px-6 py-4 text-center text-sm font-semibold text-slate-300">Joined</th>
+                        <th className="px-6 py-4 text-center text-sm font-semibold text-slate-300">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800">
+                      {members.map((member) => {
+                        const winRate = member.total_parlays > 0
+                          ? Math.round((member.total_wins / member.total_parlays) * 100)
+                          : 0;
+
+                        return (
+                          <tr key={member.id} className="hover:bg-slate-800 transition">
+                            <td className="px-6 py-4">
+                              <div>
+                                <div className="text-white font-medium">
+                                  {member.display_name || member.username}
+                                </div>
+                                <div className="text-slate-400 text-sm">@{member.username}</div>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 text-slate-300 text-sm">{member.email}</td>
+                            <td className="px-6 py-4 text-center">
+                              <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${member.membership_tier === 'vip'
+                                  ? 'bg-purple-900 text-purple-200'
+                                  : member.membership_tier === 'premium'
+                                    ? 'bg-emerald-900 text-emerald-200'
+                                    : 'bg-slate-700 text-slate-300'
+                                }`}>
+                                {member.membership_tier.toUpperCase()}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 text-center">
+                              <span className="text-emerald-400 font-semibold">{member.sms_bucks}</span>
+                            </td>
+                            <td className="px-6 py-4 text-center text-slate-300">
+                              {member.total_parlays}
+                            </td>
+                            <td className="px-6 py-4 text-center">
+                              <span className={`font-semibold ${winRate >= 60 ? 'text-green-400' :
+                                  winRate >= 40 ? 'text-yellow-400' :
+                                    'text-red-400'
+                                }`}>
+                                {winRate}%
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 text-center text-slate-400 text-sm">
+                              {new Date(member.created_at).toLocaleDateString()}
+                            </td>
+                            <td className="px-6 py-4 text-center">
+                              <button
+                                onClick={() => router.push(`/profile/${member.username}`)}
+                                className="text-emerald-400 hover:text-emerald-300 font-medium text-sm"
+                              >
+                                View Profile →
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+                <div className="flex justify-between items-center">
+                  <button
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    className={`px-4 py-2 rounded-lg font-medium transition ${currentPage === 1
+                        ? 'bg-slate-800 text-slate-600 cursor-not-allowed'
+                        : 'bg-slate-800 text-white hover:bg-slate-700'
+                      }`}
+                  >
+                    ← Previous
+                  </button>
+
+                  <span className="text-slate-400">
+                    Page <span className="text-white font-semibold">{currentPage}</span> of{' '}
+                    <span className="text-white font-semibold">{totalPages}</span>
+                  </span>
+
+                  <button
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                    className={`px-4 py-2 rounded-lg font-medium transition ${currentPage === totalPages
+                        ? 'bg-slate-800 text-slate-600 cursor-not-allowed'
+                        : 'bg-slate-800 text-white hover:bg-slate-700'
+                      }`}
+                  >
+                    Next →
+                  </button>
+                </div>
+              </div>
+            )}
+
           </div>
         )}
       </div>
