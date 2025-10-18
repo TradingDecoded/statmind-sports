@@ -169,7 +169,7 @@ class AuthService {
     try {
       const result = await pool.query(
         `SELECT u.id, u.username, u.email, u.display_name, u.avatar_url, u.bio,
-                u.account_tier, u.created_at,
+        u.account_tier, u.membership_tier, u.sms_bucks, u.created_at,
                 s.total_parlays, s.total_wins, s.total_losses, s.win_rate,
                 s.current_streak, s.best_streak
          FROM users u

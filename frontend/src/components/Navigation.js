@@ -142,8 +142,15 @@ export default function Navigation() {
                       <p className="text-sm font-medium text-white">{user.displayName || user.username}</p>
                       <p className="text-xs text-slate-400">{user.email}</p>
                       <div className="mt-2">
-                        <span className="inline-block px-2 py-1 rounded text-xs font-semibold uppercase bg-blue-600 text-white">
-                          🏆 PREMIUM
+                        <span className={`inline-block px-2 py-1 rounded text-xs font-semibold uppercase ${user.membership_tier === 'vip'
+                            ? 'bg-amber-600 text-white'
+                            : user.membership_tier === 'premium'
+                              ? 'bg-blue-600 text-white'
+                              : 'bg-slate-600 text-slate-300'
+                          }`}>
+                          {user.membership_tier === 'vip' && '👑 VIP'}
+                          {user.membership_tier === 'premium' && '🏆 PREMIUM'}
+                          {(!user.membership_tier || user.membership_tier === 'free') && '🆓 FREE'}
                         </span>
                       </div>
                     </div>

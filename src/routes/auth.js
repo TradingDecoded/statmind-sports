@@ -7,6 +7,7 @@ import express from 'express';
 import { body, validationResult } from 'express-validator';
 import authService from '../services/authService.js';
 import { requireAuth } from '../middleware/authMiddleware.js';
+import pool from '../config/database.js';
 
 const router = express.Router();
 
@@ -146,6 +147,106 @@ router.post('/logout', requireAuth, async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Logout failed'
+    });
+  }
+});
+
+// ==========================================
+// PUT /api/auth/update-profile
+// Update user profile (display name, bio)
+// ==========================================
+router.put('/update-profile', requireAuth, async (req, res) => {
+  try {
+    const { display_name, bio } = req.body;
+    const userId = req.user.id;
+
+    const result = await pool.query(
+      `UPDATE users 
+       SET display_name = $1, bio = $2, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $3
+       RETURNING id, username, email, display_name, bio`,
+      [display_name, bio, userId]
+    );
+
+    console.log(`✅ Profile updated for user: ${req.user.username}`);
+
+    res.json({
+      success: true,
+      message: 'Profile updated successfully',
+      user: result.rows[0]
+    });
+  } catch (error) {
+    console.error('Update profile error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to update profile'
+    });
+  }
+});
+
+// ==========================================
+// PUT /api/auth/change-password
+// Change user password
+// ==========================================
+router.put('/change-password', requireAuth, async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    const userId = req.user.id;
+
+    // Validate new password
+    if (!newPassword || newPassword.length < 8) {
+      return res.status(400).json({
+        success: false,
+        error: 'Password must be at least 8 characters'
+      });
+    }
+
+    // Get current password hash
+    const userResult = await pool.query(
+      'SELECT password_hash FROM users WHERE id = $1',
+      [userId]
+    );
+
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found'
+      });
+    }
+
+    // Verify current password
+    const isValidPassword = await authService.verifyPassword(
+      currentPassword,
+      userResult.rows[0].password_hash
+    );
+
+    if (!isValidPassword) {
+      return res.status(401).json({
+        success: false,
+        error: 'Current password is incorrect'
+      });
+    }
+
+    // Hash new password
+    const newPasswordHash = await authService.hashPassword(newPassword);
+
+    // Update password
+    await pool.query(
+      'UPDATE users SET password_hash = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+      [newPasswordHash, userId]
+    );
+
+    console.log(`✅ Password changed for user: ${req.user.username}`);
+
+    res.json({
+      success: true,
+      message: 'Password changed successfully'
+    });
+  } catch (error) {
+    console.error('Change password error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to change password'
     });
   }
 });

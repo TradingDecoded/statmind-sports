@@ -1,0 +1,321 @@
+'use client';
+import { useState, useEffect } from 'react';
+import { useAuth } from '../../contexts/AuthContext';
+import { useRouter } from 'next/navigation';
+
+export default function UpgradePage() {
+  const { user } = useAuth();
+  const router = useRouter();
+  const [currentTier, setCurrentTier] = useState('free');
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!user) {
+      router.push('/login');
+      return;
+    }
+    fetchMembershipInfo();
+  }, [user]);
+
+  const fetchMembershipInfo = async () => {
+    try {
+      const token = localStorage.getItem('authToken');
+      
+      if (!token) {
+        router.push('/login');
+        return;
+      }
+
+      const response = await fetch('/api/sms-bucks/membership', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setCurrentTier(data.tier);
+      }
+    } catch (error) {
+      console.error('Error fetching membership:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUpgrade = (tier) => {
+    // TODO: Implement Stripe payment integration
+    alert(`Upgrade to ${tier.toUpperCase()} coming soon! Payment integration in progress.`);
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-slate-900 to-slate-800 flex items-center justify-center">
+        <div className="text-white text-xl">Loading...</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-slate-900 to-slate-800 py-12 px-4">
+      <div className="max-w-7xl mx-auto">
+        
+        {/* Header */}
+        <div className="text-center mb-12">
+          <h1 className="text-5xl font-bold text-white mb-4">
+            Unlock Premium Features
+          </h1>
+          <p className="text-xl text-slate-300 max-w-2xl mx-auto">
+            Get SMS Bucks to enter parlays, compete in weekly competitions, and win cash prizes!
+          </p>
+        </div>
+
+        {/* What are SMS Bucks? */}
+        <div className="bg-gradient-to-r from-emerald-500 to-teal-600 rounded-2xl p-8 mb-12 shadow-xl">
+          <div className="flex items-start gap-4">
+            <div className="text-6xl">💰</div>
+            <div>
+              <h2 className="text-3xl font-bold text-white mb-3">
+                What are SMS Bucks?
+              </h2>
+              <p className="text-emerald-50 text-lg leading-relaxed">
+                SMS Bucks are our virtual currency that let you enter parlays and compete for real cash prizes. 
+                Each parlay costs SMS Bucks based on the number of legs (50-150 bucks). Win your parlay and earn 
+                rewards! Premium and VIP members get monthly SMS Bucks allowances plus daily login bonuses.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Pricing Cards */}
+        <div className="grid md:grid-cols-3 gap-8 mb-12">
+          
+          {/* FREE TIER */}
+          <div className={`bg-slate-800 rounded-2xl p-8 border-2 ${
+            currentTier === 'free' ? 'border-slate-600' : 'border-slate-700'
+          } relative`}>
+            {currentTier === 'free' && (
+              <div className="absolute top-4 right-4 bg-slate-600 text-white px-3 py-1 rounded-full text-sm font-semibold">
+                Current Plan
+              </div>
+            )}
+            
+            <div className="text-center mb-6">
+              <div className="text-4xl mb-3">🆓</div>
+              <h3 className="text-2xl font-bold text-white mb-2">Free</h3>
+              <div className="text-4xl font-bold text-white mb-1">$0</div>
+              <div className="text-slate-400">Forever free</div>
+            </div>
+
+            <div className="space-y-3 mb-8">
+              <div className="flex items-start gap-3">
+                <span className="text-green-400 text-xl">✓</span>
+                <span className="text-slate-300">View AI predictions</span>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="text-green-400 text-xl">✓</span>
+                <span className="text-slate-300">Browse leaderboards</span>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="text-green-400 text-xl">✓</span>
+                <span className="text-slate-300">See results & analytics</span>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="text-red-400 text-xl">✗</span>
+                <span className="text-slate-500">No SMS Bucks</span>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="text-red-400 text-xl">✗</span>
+                <span className="text-slate-500">Can't enter parlays</span>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="text-red-400 text-xl">✗</span>
+                <span className="text-slate-500">No competitions</span>
+              </div>
+            </div>
+
+            {currentTier === 'free' && (
+              <div className="text-center text-slate-400 text-sm">
+                Upgrade to compete!
+              </div>
+            )}
+          </div>
+
+          {/* PREMIUM TIER */}
+          <div className={`bg-gradient-to-br from-purple-600 to-pink-600 rounded-2xl p-8 border-2 border-purple-400 relative transform md:scale-105 shadow-2xl`}>
+            <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 bg-yellow-400 text-slate-900 px-4 py-1 rounded-full text-sm font-bold">
+              MOST POPULAR
+            </div>
+            
+            {currentTier === 'premium' && (
+              <div className="absolute top-4 right-4 bg-white text-purple-600 px-3 py-1 rounded-full text-sm font-semibold">
+                Current Plan
+              </div>
+            )}
+            
+            <div className="text-center mb-6">
+              <div className="text-4xl mb-3">🏆</div>
+              <h3 className="text-2xl font-bold text-white mb-2">Premium</h3>
+              <div className="text-4xl font-bold text-white mb-1">$19.99</div>
+              <div className="text-purple-100">per month</div>
+            </div>
+
+            <div className="space-y-3 mb-8">
+              <div className="flex items-start gap-3">
+                <span className="text-yellow-300 text-xl">★</span>
+                <span className="text-white font-semibold">300 SMS Bucks/month</span>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="text-yellow-300 text-xl">★</span>
+                <span className="text-white">Daily login bonus (+5)</span>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="text-yellow-300 text-xl">★</span>
+                <span className="text-white">Enter 10 parlays/week</span>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="text-yellow-300 text-xl">★</span>
+                <span className="text-white">Compete for $50 weekly prize</span>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="text-yellow-300 text-xl">★</span>
+                <span className="text-white">Win rewards (+25 per win)</span>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="text-yellow-300 text-xl">★</span>
+                <span className="text-white">Track your stats</span>
+              </div>
+            </div>
+
+            {currentTier !== 'premium' && (
+              <button
+                onClick={() => handleUpgrade('premium')}
+                className="w-full bg-white text-purple-600 py-3 rounded-xl font-bold text-lg hover:bg-purple-50 transition-all shadow-lg hover:shadow-xl"
+              >
+                Upgrade to Premium
+              </button>
+            )}
+            {currentTier === 'premium' && (
+              <div className="text-center text-purple-100 font-semibold">
+                You're on this plan! 🎉
+              </div>
+            )}
+          </div>
+
+          {/* VIP TIER */}
+          <div className={`bg-gradient-to-br from-amber-500 to-orange-600 rounded-2xl p-8 border-2 border-amber-400 relative shadow-xl`}>
+            {currentTier === 'vip' && (
+              <div className="absolute top-4 right-4 bg-white text-amber-600 px-3 py-1 rounded-full text-sm font-semibold">
+                Current Plan
+              </div>
+            )}
+            
+            <div className="text-center mb-6">
+              <div className="text-4xl mb-3">👑</div>
+              <h3 className="text-2xl font-bold text-white mb-2">VIP</h3>
+              <div className="text-4xl font-bold text-white mb-1">$49.99</div>
+              <div className="text-amber-100">per month</div>
+            </div>
+
+            <div className="space-y-3 mb-8">
+              <div className="flex items-start gap-3">
+                <span className="text-yellow-200 text-xl">★</span>
+                <span className="text-white font-semibold">750 SMS Bucks/month</span>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="text-yellow-200 text-xl">★</span>
+                <span className="text-white">Daily login bonus (+10)</span>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="text-yellow-200 text-xl">★</span>
+                <span className="text-white">UNLIMITED parlays/week</span>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="text-yellow-200 text-xl">★</span>
+                <span className="text-white">Bigger win rewards (+50)</span>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="text-yellow-200 text-xl">★</span>
+                <span className="text-white">Priority support</span>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="text-yellow-200 text-xl">★</span>
+                <span className="text-white">Exclusive VIP badge</span>
+              </div>
+            </div>
+
+            {currentTier !== 'vip' && (
+              <button
+                onClick={() => handleUpgrade('vip')}
+                className="w-full bg-white text-amber-600 py-3 rounded-xl font-bold text-lg hover:bg-amber-50 transition-all shadow-lg hover:shadow-xl"
+              >
+                Upgrade to VIP
+              </button>
+            )}
+            {currentTier === 'vip' && (
+              <div className="text-center text-amber-100 font-semibold">
+                You're VIP! 👑
+              </div>
+            )}
+          </div>
+
+        </div>
+
+        {/* FAQ Section */}
+        <div className="bg-slate-800 rounded-2xl p-8 mb-8">
+          <h2 className="text-3xl font-bold text-white mb-6 text-center">
+            Frequently Asked Questions
+          </h2>
+          
+          <div className="space-y-6 max-w-3xl mx-auto">
+            <div>
+              <h3 className="text-xl font-semibold text-emerald-400 mb-2">
+                How do parlay costs work?
+              </h3>
+              <p className="text-slate-300">
+                2-leg parlay = 50 SMS Bucks • 3-leg = 75 • 4-leg = 100 • 5-leg = 125 • 6+ legs = 150
+              </p>
+            </div>
+
+            <div>
+              <h3 className="text-xl font-semibold text-emerald-400 mb-2">
+                Can I earn more SMS Bucks?
+              </h3>
+              <p className="text-slate-300">
+                Yes! Get +5 daily login bonus, win parlays for rewards (+25 Premium, +50 VIP), 
+                and earn bonuses for sharing your wins on social media.
+              </p>
+            </div>
+
+            <div>
+              <h3 className="text-xl font-semibold text-emerald-400 mb-2">
+                What happens to unused SMS Bucks?
+              </h3>
+              <p className="text-slate-300">
+                They roll over! Your SMS Bucks never expire as long as you maintain your subscription.
+              </p>
+            </div>
+
+            <div>
+              <h3 className="text-xl font-semibold text-emerald-400 mb-2">
+                Can I cancel anytime?
+              </h3>
+              <p className="text-slate-300">
+                Yes! Cancel anytime. You'll keep your SMS Bucks until the end of your billing period.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Back Button */}
+        <div className="text-center">
+          <button
+            onClick={() => router.push('/')}
+            className="text-slate-400 hover:text-white transition-colors"
+          >
+            ← Back to Dashboard
+          </button>
+        </div>
+
+      </div>
+    </div>
+  );
+}
