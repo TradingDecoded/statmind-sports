@@ -69,7 +69,7 @@ export default function ParlayBuilderPage() {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://statmindsports.com/api';
       const response = await fetch(`${apiUrl}/competition/status`, {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
         }
       });
       const data = await response.json();
@@ -260,16 +260,23 @@ export default function ParlayBuilderPage() {
     <div className="min-h-screen bg-slate-950 py-8">
       <div className="max-w-7xl mx-auto px-4">
 
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold text-white mb-2">🎲 Parlay Builder</h1>
-          <p className="text-slate-400">
-            Create your custom parlay for Week {currentWeek} • Select 2+ games
-          </p>
-        </div>
+        {/* Header with Competition Status */}
+        <div className="flex items-start justify-between gap-6 mb-8">
+          {/* Left: Header */}
+          <div>
+            <h1 className="text-4xl font-bold text-white mb-2">🎲 Parlay Builder</h1>
+            <p className="text-slate-400">
+              Create your custom parlay for Week {currentWeek} • Select 2+ games
+            </p>
+          </div>
 
-        {/* Competition Status Banner */}
-        {competitionStatus && <CompetitionStatusBanner status={competitionStatus} />}
+          {/* Right: Competition Status Banner */}
+          {competitionStatus && (
+            <div className="flex-shrink-0 w-[700px]">
+              <CompetitionStatusBanner status={competitionStatus} />
+            </div>
+          )}
+        </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
 

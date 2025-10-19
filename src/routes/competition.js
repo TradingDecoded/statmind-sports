@@ -85,12 +85,14 @@ router.get('/status', optionalAuth, async (req, res) => {
   try {
     const userId = req.user.id;
 
-    // Get current year and week
+    // Get current year and week (using ISO week calculation)
     const now = new Date();
-    const currentYear = now.getFullYear();
-    const startOfYear = new Date(currentYear, 0, 1);
-    const days = Math.floor((now - startOfYear) / (24 * 60 * 60 * 1000));
-    const currentWeek = Math.ceil((days + startOfYear.getDay() + 1) / 7);
+    const d = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
+    const dayNum = d.getUTCDay() || 7;
+    d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+    const currentWeek = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+    const currentYear = d.getUTCFullYear();
 
     // Get user membership info
     // If no user logged in, return free user status
