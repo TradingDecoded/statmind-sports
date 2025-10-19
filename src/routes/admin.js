@@ -55,4 +55,50 @@ router.put('/weights', async (req, res) => {
   }
 });
 
+// POST /api/admin/weights/set-default
+router.post('/weights/set-default', async (req, res) => {
+  try {
+    // Copy current weight_value to default_value for all weights
+    await pool.query(
+      'UPDATE prediction_weights SET default_value = weight_value'
+    );
+    
+    console.log(`✅ Admin ${req.user.username} set current weights as default`);
+    
+    res.json({ 
+      success: true,
+      message: 'Current weights saved as default' 
+    });
+  } catch (error) {
+    console.error('Set default weights error:', error);
+    res.status(500).json({ error: 'Failed to set default weights' });
+  }
+});
+
+// POST /api/admin/weights/reset-to-default
+router.post('/weights/reset-to-default', async (req, res) => {
+  try {
+    // Copy default_value to weight_value for all weights
+    await pool.query(
+      'UPDATE prediction_weights SET weight_value = default_value'
+    );
+    
+    // Get the updated weights to return to frontend
+    const result = await pool.query(
+      'SELECT * FROM prediction_weights ORDER BY weight_name'
+    );
+    
+    console.log(`✅ Admin ${req.user.username} reset weights to default`);
+    
+    res.json({ 
+      success: true,
+      message: 'Weights reset to default values',
+      weights: result.rows
+    });
+  } catch (error) {
+    console.error('Reset default weights error:', error);
+    res.status(500).json({ error: 'Failed to reset to default weights' });
+  }
+});
+
 export default router;

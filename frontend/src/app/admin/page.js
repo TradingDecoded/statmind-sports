@@ -32,13 +32,16 @@ export default function AdminPage() {
 
   // Prediction weights state
   const [weights, setWeights] = useState({
-    elo: 20,
-    power: 20,
-    situational: 20,
+    elo: 35,
+    power: 15,
+    situational: 25,
     matchup: 20,
-    recentForm: 20
+    recentForm: 5
   });
   const [saveMessage, setSaveMessage] = useState('');
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [pendingWeights, setPendingWeights] = useState(null);
+  const [originalWeights, setOriginalWeights] = useState(null);
 
   // Check if user is admin
   useEffect(() => {
@@ -77,6 +80,7 @@ export default function AdminPage() {
           weightsObj[w.weight_name] = w.weight_value * 100;
         });
         setWeights(weightsObj);
+        setOriginalWeights(weightsObj);
       }
     } catch (error) {
       console.error('Failed to fetch weights:', error);
@@ -334,16 +338,24 @@ export default function AdminPage() {
   const totalPercentage = Object.values(weights).reduce((sum, val) => sum + val, 0);
 
   // Save weights
-  const handleSaveWeights = async () => {
+  // Open confirmation modal instead of saving directly
+  const handleSaveWeights = () => {
     if (Math.abs(totalPercentage - 100) > 0.1) {
       setSaveMessage('⚠️ Weights must total 100%');
       return;
     }
 
+    // Store pending weights and show confirmation modal
+    setPendingWeights(weights);
+    setShowConfirmModal(true);
+  };
+
+  // Actual save function (called after confirmation)
+  const confirmSaveWeights = async () => {
     const token = localStorage.getItem('authToken');
 
     const weightsDecimal = {};
-    Object.entries(weights).forEach(([key, value]) => {
+    Object.entries(pendingWeights).forEach(([key, value]) => {
       weightsDecimal[key] = value / 100;
     });
 
@@ -360,14 +372,82 @@ export default function AdminPage() {
       const data = await response.json();
 
       if (response.ok) {
-        setSaveMessage('✅ Weights saved successfully!');
-        setTimeout(() => setSaveMessage(''), 3000);
+        setSaveMessage('✅ Weights saved successfully! Predictions will use new weights.');
+        setOriginalWeights(pendingWeights); // Update original weights
+        setShowConfirmModal(false);
+        setPendingWeights(null);
       } else {
-        setSaveMessage('❌ Failed to save weights');
+        setSaveMessage(`❌ ${data.error}`);
+        setShowConfirmModal(false);
       }
     } catch (error) {
-      console.error('Save weights error:', error);
       setSaveMessage('❌ Failed to save weights');
+      setShowConfirmModal(false);
+    }
+  };
+
+  // Cancel save
+  const cancelSaveWeights = () => {
+    setShowConfirmModal(false);
+    setPendingWeights(null);
+  };
+
+  // Set current weights as default
+  const handleSetAsDefault = async () => {
+    const token = localStorage.getItem('authToken');
+
+    try {
+      const response = await fetch('/api/admin/weights/set-default', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setSaveMessage('✅ Current weights saved as default configuration');
+      } else {
+        setSaveMessage(`❌ ${data.error}`);
+      }
+    } catch (error) {
+      setSaveMessage('❌ Failed to set default weights');
+    }
+  };
+
+  // Reset weights to default values
+  const handleResetToDefault = async () => {
+    if (!confirm('Reset all weights to default values? This will discard current changes.')) {
+      return;
+    }
+
+    const token = localStorage.getItem('authToken');
+
+    try {
+      const response = await fetch('/api/admin/weights/reset-to-default', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        // Update weights from response
+        const weightsObj = {};
+        data.weights.forEach(w => {
+          weightsObj[w.weight_name] = w.weight_value * 100;
+        });
+        setWeights(weightsObj);
+        setOriginalWeights(weightsObj);
+        setSaveMessage('✅ Weights reset to default values');
+      } else {
+        setSaveMessage(`❌ ${data.error}`);
+      }
+    } catch (error) {
+      setSaveMessage('❌ Failed to reset to default');
     }
   };
 
@@ -539,19 +619,30 @@ export default function AdminPage() {
               )}
             </div>
 
-            {/* Save Button */}
-            <div className="mt-6 flex gap-4 items-center">
+            {/* Buttons */}
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={handleResetToDefault}
+                className="px-4 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600 transition-colors text-sm"
+              >
+                Reset to Default
+              </button>
+              <button
+                onClick={handleSetAsDefault}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
+              >
+                Set Current as Default
+              </button>
               <button
                 onClick={handleSaveWeights}
                 disabled={Math.abs(totalPercentage - 100) > 0.1}
-                className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-700 disabled:cursor-not-allowed text-white font-semibold px-8 py-3 rounded-lg transition"
+                className={`px-6 py-2 rounded-lg transition-colors font-medium ${Math.abs(totalPercentage - 100) < 0.1
+                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                    : 'bg-slate-700 text-slate-500 cursor-not-allowed'
+                  }`}
               >
                 Save Changes
               </button>
-
-              {saveMessage && (
-                <span className="text-sm font-medium">{saveMessage}</span>
-              )}
             </div>
           </div>
         )}
@@ -933,6 +1024,70 @@ export default function AdminPage() {
           </div>
         )}
       </div>
+      {/* Confirmation Modal */}
+      {showConfirmModal && pendingWeights && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-800 rounded-lg max-w-2xl w-full p-6 border border-slate-700">
+            <h3 className="text-xl font-bold text-white mb-4">
+              ⚠️ Confirm Weight Changes
+            </h3>
+            
+            <div className="bg-yellow-900 bg-opacity-30 border border-yellow-700 rounded-lg p-4 mb-4">
+              <p className="text-yellow-300 text-sm">
+                <strong>Warning:</strong> These changes will affect all future predictions. 
+                Make sure you understand the impact before proceeding.
+              </p>
+            </div>
+
+            <div className="space-y-3 mb-6">
+              <p className="text-slate-300 font-medium mb-2">Weight Changes:</p>
+              
+              {Object.entries(pendingWeights).map(([key, newValue]) => {
+                const oldValue = originalWeights[key];
+                const hasChanged = Math.abs(newValue - oldValue) > 0.1;
+                const displayName = key === 'recentForm' ? 'Recent Form' 
+                  : key.charAt(0).toUpperCase() + key.slice(1);
+                
+                return (
+                  <div key={key} className={`flex justify-between items-center p-3 rounded ${
+                    hasChanged ? 'bg-slate-700' : 'bg-slate-800'
+                  }`}>
+                    <span className="text-slate-300">{displayName}</span>
+                    <div className="flex items-center gap-3">
+                      <span className={hasChanged ? 'text-slate-400 line-through' : 'text-slate-400'}>
+                        {oldValue.toFixed(1)}%
+                      </span>
+                      {hasChanged && (
+                        <>
+                          <span className="text-slate-500">→</span>
+                          <span className="text-emerald-400 font-bold">
+                            {newValue.toFixed(1)}%
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={cancelSaveWeights}
+                className="px-6 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmSaveWeights}
+                className="px-6 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors font-medium"
+              >
+                Confirm Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
