@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSMSBucks } from '../../contexts/SMSBucksContext';
+import { formatShortGameDateTime } from '@/utils/dateTimeUtils';
 
 export default function ParlayBuilderPage() {
   const router = useRouter();
@@ -317,11 +318,7 @@ export default function ParlayBuilderPage() {
                         {/* Header - Date */}
                         <div className="bg-slate-800/80 px-3 py-1.5 border-b border-slate-700/50">
                           <div className="text-xs text-slate-300 font-medium">
-                            {new Date(game.game_date).toLocaleDateString('en-US', {
-                              weekday: 'short',
-                              month: 'short',
-                              day: 'numeric'
-                            })}
+                            {formatShortGameDateTime(game.game_date)}
                           </div>
                         </div>
 

@@ -3,6 +3,7 @@
 
 import { useState } from 'react';
 import { getTeamLogo, getTeamName } from '@/utils/teamLogos';
+import { formatGameDateTime } from '@/utils/dateTimeUtils';
 import ConfidenceBadge from './ConfidenceBadge';
 import GameDetailModal from './GameDetailModal';
 
@@ -55,19 +56,14 @@ export default function PredictionCard({ prediction }) {
           }`}
           onClick={() => setShowModal(true)}
         >
-          {/* Header with Result Badge */}
+          {/* Header with Result Badge - ADDED TIME HERE */}
           <div className={`px-4 py-2 border-b flex items-center justify-between ${
             wasCorrect 
               ? 'bg-emerald-500/10 border-emerald-500/30' 
               : 'bg-red-500/10 border-red-500/30'
           }`}>
             <p className="text-slate-400 text-sm">
-              {gameDate.toLocaleDateString('en-US', { 
-                weekday: 'short', 
-                month: 'short', 
-                day: 'numeric',
-                year: 'numeric'
-              })}
+              {formatGameDateTime(date, true)}
             </p>
             <div className={`px-3 py-1 rounded-full text-xs font-bold ${
               wasCorrect 
@@ -157,14 +153,10 @@ export default function PredictionCard({ prediction }) {
         className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden hover:border-emerald-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-emerald-500/10 cursor-pointer"
         onClick={() => setShowModal(true)}
       >
-        {/* Date Header */}
+        {/* Date Header - ADDED TIME HERE */}
         <div className="bg-slate-900/50 px-4 py-2 border-b border-slate-700">
           <p className="text-slate-400 text-sm">
-            {gameDate.toLocaleDateString('en-US', { 
-              weekday: 'short', 
-              month: 'short', 
-              day: 'numeric'
-            })}
+            {formatGameDateTime(date, true)}
           </p>
         </div>
         
@@ -201,7 +193,7 @@ export default function PredictionCard({ prediction }) {
             </div>
           </div>
           
-          {/* Probability Bar */}
+          {/* Probability Bar - ORIGINAL COLORS PRESERVED */}
           <div className="mb-4">
             <div className="w-full bg-slate-700 rounded-full h-2 overflow-hidden flex">
               <div 
