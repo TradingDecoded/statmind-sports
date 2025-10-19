@@ -77,7 +77,7 @@ class ParlayService {
       // Get individual probabilities
       const probabilities = games.map(game => {
         // Ensure win_probability exists and is a number
-        let prob = parseFloat(game.win_probability);
+        let prob = parseFloat(game.ai_probability || game.win_probability);
 
         // If it's already a decimal (0-1), use as-is
         // If it's a percentage (1-100), convert to decimal
@@ -155,47 +155,51 @@ class ParlayService {
 
       const { membership_tier, sms_bucks } = userResult.rows[0];
 
-      // 2. Check if user is Premium or VIP (Free users can't create parlays)
-      if (membership_tier === 'free') {
-        throw new Error('Premium or VIP membership required to create parlays');
-      }
+      // 2. Determine if user can enter contest (VIP/Premium only)
+      const canEnterContest = (membership_tier === 'vip' || membership_tier === 'premium');
+      const isFreeTier = (membership_tier === 'free');
 
-      // 3. Calculate SMS Bucks cost based on leg count
-      const smsBucksCost = this.calculateParlayCost(legCount);
-
-      // 4. Check if user has enough SMS Bucks
-      if (sms_bucks < smsBucksCost) {
-        throw new Error(`Insufficient SMS Bucks. Need ${smsBucksCost}, have ${sms_bucks}`);
-      }
-
-      // 5. Check weekly parlay limit (max 10 per week)
+      // 3. Calculate SMS Bucks cost and check weekly limits (only for VIP/Premium entering contest)
+      let smsBucksCost = 0;
+      let competitionId = null;
       const currentYear = new Date().getFullYear();
       const currentWeek = this.getWeekNumber(new Date());
+      let currentWeekCount = 0;  // ← ADD THIS LINE
 
-      const weeklyCountResult = await client.query(
-        `SELECT parlay_count FROM weekly_parlay_counts 
-         WHERE user_id = $1 AND year = $2 AND week_number = $3`,
-        [userId, currentYear, currentWeek]
-      );
+      if (canEnterContest) {
+        smsBucksCost = this.calculateParlayCost(legCount);
 
-      const currentWeekCount = weeklyCountResult.rows.length > 0
-        ? weeklyCountResult.rows[0].parlay_count
-        : 0;
+        // 4. Check if user has enough SMS Bucks (only for contest entry)
+        if (sms_bucks < smsBucksCost) {
+          throw new Error(`Insufficient SMS Bucks. Need ${smsBucksCost}, have ${sms_bucks}`);
+        }
 
-      if (currentWeekCount >= 10) {
-        throw new Error('Weekly parlay limit reached (10 parlays per week)');
+        // 5. Check weekly parlay limit for contest entries (max 10 per week)
+        const weeklyCountResult = await client.query(
+          `SELECT parlay_count FROM weekly_parlay_counts 
+           WHERE user_id = $1 AND year = $2 AND week_number = $3`,
+          [userId, currentYear, currentWeek]
+        );
+
+        currentWeekCount = weeklyCountResult.rows.length > 0
+          ? weeklyCountResult.rows[0].parlay_count
+          : 0;
+
+        if (currentWeekCount >= 10) {
+          throw new Error('Weekly contest entry limit reached (10 parlays per week)');
+        }
+
+        // 6. Get active competition ID (only for VIP/Premium)
+        const competitionResult = await client.query(
+          `SELECT id FROM weekly_competitions 
+           WHERE status = 'active' AND year = $1 AND week_number = $2`,
+          [currentYear, currentWeek]
+        );
+
+        competitionId = competitionResult.rows.length > 0
+          ? competitionResult.rows[0].id
+          : null;
       }
-
-      // 6. Get active competition ID
-      const competitionResult = await client.query(
-        `SELECT id FROM weekly_competitions 
-         WHERE status = 'active' AND year = $1 AND week_number = $2`,
-        [currentYear, currentWeek]
-      );
-
-      const competitionId = competitionResult.rows.length > 0
-        ? competitionResult.rows[0].id
-        : null;
 
       // 7. Calculate probability
       const calculation = this.calculateParlayProbability(games);
@@ -237,34 +241,36 @@ class ParlayService {
 
       const parlayId = parlayResult.rows[0].id;
 
-      // 10. Deduct SMS Bucks
-      const newBalance = sms_bucks - smsBucksCost;
-      await client.query(
-        'UPDATE users SET sms_bucks = $1 WHERE id = $2',
-        [newBalance, userId]
-      );
+      // 10. Deduct SMS Bucks and update contest tracking (only for VIP/Premium)
+      if (canEnterContest && smsBucksCost > 0) {
+        const newBalance = sms_bucks - smsBucksCost;
+        await client.query(
+          'UPDATE users SET sms_bucks = $1 WHERE id = $2',
+          [newBalance, userId]
+        );
 
-      // 11. Record SMS Bucks transaction
-      await client.query(
-        `INSERT INTO sms_bucks_transactions 
-         (user_id, amount, transaction_type, balance_after, description, related_parlay_id)
-         VALUES ($1, $2, $3, $4, $5, $6)`,
-        [userId, -smsBucksCost, 'parlay_entry', newBalance,
-          `Parlay entry: ${parlayName} (${legCount} legs)`, parlayId]
-      );
+        // 11. Record SMS Bucks transaction
+        await client.query(
+          `INSERT INTO sms_bucks_transactions 
+           (user_id, amount, transaction_type, balance_after, description, related_parlay_id)
+           VALUES ($1, $2, $3, $4, $5, $6)`,
+          [userId, -smsBucksCost, 'parlay_entry', newBalance,
+            `Contest entry: ${parlayName} (${legCount} legs)`, parlayId]
+        );
 
-      // 12. Update weekly parlay count
-      await client.query(
-        `INSERT INTO weekly_parlay_counts (user_id, year, week_number, parlay_count, last_parlay_date)
-         VALUES ($1, $2, $3, 1, NOW())
-         ON CONFLICT (user_id, year, week_number) 
-         DO UPDATE SET parlay_count = weekly_parlay_counts.parlay_count + 1, 
-                       last_parlay_date = NOW()`,
-        [userId, currentYear, currentWeek]
-      );
+        // 12. Update weekly parlay count (contest entries only)
+        await client.query(
+          `INSERT INTO weekly_parlay_counts (user_id, year, week_number, parlay_count, last_parlay_date)
+           VALUES ($1, $2, $3, 1, NOW())
+           ON CONFLICT (user_id, year, week_number) 
+           DO UPDATE SET parlay_count = weekly_parlay_counts.parlay_count + 1, 
+                         last_parlay_date = NOW()`,
+          [userId, currentYear, currentWeek]
+        );
+      }
 
-      // 13. Update or create competition standing
-      if (competitionId) {
+      // 13. Update competition standings (only for VIP/Premium with active competition)
+      if (canEnterContest && competitionId) {
         await client.query(
           `INSERT INTO weekly_competition_standings (competition_id, user_id, parlays_entered)
            VALUES ($1, $2, 1)
@@ -309,8 +315,8 @@ class ParlayService {
         parlay: parlayResult.rows[0],
         calculation,
         smsBucksCost,
-        newBalance,
-        weeklyParlaysRemaining: 10 - (currentWeekCount + 1)
+        enteredContest: canEnterContest && competitionId !== null,
+        weeklyParlaysRemaining: canEnterContest ? (10 - (currentWeekCount + 1)) : null
       };
 
     } catch (error) {
@@ -459,10 +465,10 @@ class ParlayService {
   // ==========================================
   async awardWinBonus(parlayId) {
     const client = await pool.connect();
-    
+
     try {
       await client.query('BEGIN');
-      
+
       // Get parlay and user info
       const parlayResult = await client.query(
         `SELECT up.user_id, up.leg_count, up.sms_bucks_reward, u.membership_tier, u.sms_bucks
@@ -471,59 +477,59 @@ class ParlayService {
          WHERE up.id = $1`,
         [parlayId]
       );
-      
+
       if (parlayResult.rows.length === 0) {
         throw new Error('Parlay not found');
       }
-      
+
       const { user_id, leg_count, sms_bucks_reward, membership_tier, sms_bucks } = parlayResult.rows[0];
-      
+
       // Check if bonus already awarded
       if (sms_bucks_reward > 0) {
         console.log(`⚠️ Win bonus already awarded for parlay ${parlayId}`);
         return { success: false, message: 'Bonus already awarded' };
       }
-      
+
       // Calculate bonus based on tier
       const bonus = membership_tier === 'vip' ? 50 : membership_tier === 'premium' ? 25 : 0;
-      
+
       if (bonus === 0) {
         console.log(`⚠️ No bonus for free tier user`);
         return { success: false, message: 'Free users do not receive win bonuses' };
       }
-      
+
       // Update user balance
       const newBalance = sms_bucks + bonus;
       await client.query(
         'UPDATE users SET sms_bucks = $1 WHERE id = $2',
         [newBalance, user_id]
       );
-      
+
       // Record transaction
       await client.query(
         `INSERT INTO sms_bucks_transactions 
          (user_id, amount, transaction_type, balance_after, description, related_parlay_id)
          VALUES ($1, $2, $3, $4, $5, $6)`,
-        [user_id, bonus, 'parlay_win', newBalance, 
-         `Parlay win bonus (${leg_count} legs)`, parlayId]
+        [user_id, bonus, 'parlay_win', newBalance,
+          `Parlay win bonus (${leg_count} legs)`, parlayId]
       );
-      
+
       // Update parlay reward record
       await client.query(
         'UPDATE user_parlays SET sms_bucks_reward = $1 WHERE id = $2',
         [bonus, parlayId]
       );
-      
+
       await client.query('COMMIT');
-      
+
       console.log(`✅ Win bonus awarded: ${bonus} SMS Bucks to user ${user_id} for parlay ${parlayId}`);
-      
+
       return {
         success: true,
         bonus,
         newBalance
       };
-      
+
     } catch (error) {
       await client.query('ROLLBACK');
       console.error('Award win bonus error:', error);

@@ -85,6 +85,7 @@ export default function MyParlaysPage() {
 
       // Also fetch fresh data
       await fetchMyParlays();
+      await fetchUserStats();
 
       alert('Parlay deleted successfully');
     } catch (err) {
