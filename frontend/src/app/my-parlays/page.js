@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { getTeamLogo, getTeamName } from '@/utils/teamLogos';
 
 export default function MyParlaysPage() {
   const router = useRouter();
@@ -10,6 +11,8 @@ export default function MyParlaysPage() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
   const [userStats, setUserStats] = useState(null);
+  const [expandedParlays, setExpandedParlays] = useState(new Set());
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     const token = localStorage.getItem('authToken');
@@ -77,13 +80,8 @@ export default function MyParlaysPage() {
 
       if (!response.ok) throw new Error('Failed to delete');
 
-      // Optimistically remove from state
       setParlays(prevParlays => prevParlays.filter(p => p.id !== parlayId));
-
-      // Force Next.js to refresh
       router.refresh();
-
-      // Also fetch fresh data
       await fetchMyParlays();
       await fetchUserStats();
 
@@ -93,6 +91,48 @@ export default function MyParlaysPage() {
       alert('Failed to delete parlay');
       fetchMyParlays();
     }
+  };
+
+  const toggleExpanded = (parlayId) => {
+    setExpandedParlays(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(parlayId)) {
+        newSet.delete(parlayId);
+      } else {
+        newSet.add(parlayId);
+      }
+      return newSet;
+    });
+  };
+
+  // Fix probability display - handle both decimal and percentage formats
+  const formatProbability = (prob) => {
+    // Handle null, undefined, or non-numeric values
+    if (prob === null || prob === undefined || isNaN(prob)) {
+      return 'N/A';
+    }
+    
+    // Convert to number if it's a string
+    const numProb = typeof prob === 'string' ? parseFloat(prob) : prob;
+    
+    // Check again after conversion
+    if (isNaN(numProb)) {
+      return 'N/A';
+    }
+    
+    // If it's already a large number (like 1460), it's stored incorrectly
+    // We'll divide by 100 to get the correct percentage
+    if (numProb > 100) {
+      return (numProb / 100).toFixed(1) + '%';
+    }
+    
+    // If it's between 0 and 1 (decimal format like 0.146)
+    if (numProb <= 1) {
+      return (numProb * 100).toFixed(1) + '%';
+    }
+    
+    // If it's already a percentage between 1-100
+    return numProb.toFixed(1) + '%';
   };
 
   const filteredParlays = parlays.filter(parlay => {
@@ -106,185 +146,342 @@ export default function MyParlaysPage() {
       won: 'bg-green-500/20 text-green-300 border-green-500',
       lost: 'bg-red-500/20 text-red-300 border-red-500'
     };
+    return `${styles[status] || styles.pending} px-3 py-1 rounded-full text-xs border font-semibold uppercase`;
+  };
+
+  const getRiskBadge = (risk) => {
+    const styles = {
+      Low: 'bg-emerald-500/20 text-emerald-300 border-emerald-500',
+      Medium: 'bg-amber-500/20 text-amber-300 border-amber-500',
+      High: 'bg-red-500/20 text-red-300 border-red-500'
+    };
+    return `${styles[risk] || styles.Medium} px-2 py-1 rounded text-xs border`;
+  };
+
+  // Render individual pick details with team logos - COMPACT VERSION
+  const renderPickDetails = (parlay) => {
+    if (!parlay.games || parlay.games.length === 0) {
+      return (
+        <div className="text-slate-400 text-sm italic">
+          No pick details available
+        </div>
+      );
+    }
+
+    const isResolved = parlay.is_hit !== null;
 
     return (
-      <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${styles[status] || styles.pending}`}>
-        {status?.toUpperCase() || 'PENDING'}
-      </span>
+      <div className="space-y-2 mt-3">
+        <div className="text-xs font-semibold text-slate-400 mb-2">
+          Your Picks ({parlay.games.length} legs):
+        </div>
+        {parlay.games.map((game, index) => {
+          const matchup = `${game.away_team} @ ${game.home_team}`;
+          const pickedTeam = game.picked_winner;
+          const aiPick = game.ai_winner;
+          
+          // Safely format AI probability
+          let aiProb = 'N/A';
+          if (game.ai_probability !== null && game.ai_probability !== undefined) {
+            const probNum = typeof game.ai_probability === 'string' 
+              ? parseFloat(game.ai_probability) 
+              : game.ai_probability;
+            if (!isNaN(probNum)) {
+              aiProb = (probNum * 100).toFixed(1);
+            }
+          }
+          
+          // Determine if this pick matches AI
+          const matchesAI = pickedTeam === aiPick;
+          
+          return (
+            <div 
+              key={index} 
+              className="bg-slate-900/50 border border-slate-700 rounded-lg p-3"
+            >
+              {/* Compact Header */}
+              <div className="flex items-center justify-between mb-2">
+                <div className="text-slate-400 text-xs font-medium">
+                  LEG {index + 1}
+                </div>
+                {matchesAI && (
+                  <span className="text-xs text-emerald-400 bg-emerald-500/20 px-2 py-0.5 rounded flex items-center gap-1">
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    Matched AI
+                  </span>
+                )}
+              </div>
+
+              {/* Compact Matchup with Team Logos */}
+              <div className="flex items-center justify-between mb-2">
+                {/* Away Team */}
+                <div className={`flex items-center gap-2 ${pickedTeam === game.away_team ? 'opacity-100' : 'opacity-50'}`}>
+                  <img 
+                    src={getTeamLogo(game.away_team)} 
+                    alt={getTeamName(game.away_team)}
+                    className="w-8 h-8 object-contain"
+                    onError={(e) => {
+                      e.target.src = '/images/nfl-logo.png';
+                    }}
+                  />
+                  <div>
+                    <div className={`font-semibold text-sm ${pickedTeam === game.away_team ? 'text-white' : 'text-slate-500'}`}>
+                      {game.away_team}
+                    </div>
+                    {pickedTeam === game.away_team && (
+                      <div className="text-xs text-emerald-400 font-medium">YOUR PICK</div>
+                    )}
+                  </div>
+                </div>
+
+                {/* @ Symbol */}
+                <div className="text-slate-600 font-bold text-sm mx-1">@</div>
+
+                {/* Home Team */}
+                <div className={`flex items-center gap-2 ${pickedTeam === game.home_team ? 'opacity-100' : 'opacity-50'}`}>
+                  <div className="text-right">
+                    <div className={`font-semibold text-sm ${pickedTeam === game.home_team ? 'text-white' : 'text-slate-500'}`}>
+                      {game.home_team}
+                    </div>
+                    {pickedTeam === game.home_team && (
+                      <div className="text-xs text-emerald-400 font-medium">YOUR PICK</div>
+                    )}
+                  </div>
+                  <img 
+                    src={getTeamLogo(game.home_team)} 
+                    alt={getTeamName(game.home_team)}
+                    className="w-8 h-8 object-contain"
+                    onError={(e) => {
+                      e.target.src = '/images/nfl-logo.png';
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Compact AI Pick Info */}
+              <div className="pt-2 border-t border-slate-700">
+                <div className="flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-1.5 text-slate-500">
+                    <svg className="w-3 h-3 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                    </svg>
+                    <span>AI Predicted:</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className={matchesAI ? 'text-emerald-400 font-semibold' : 'text-amber-400 font-semibold'}>
+                      {aiPick}
+                    </span>
+                    <span className="text-slate-600">•</span>
+                    <span className="text-slate-400">{aiProb}% confidence</span>
+                  </div>
+                </div>
+              </div>
+
+              {isResolved && (
+                <div className="mt-2 pt-2 border-t border-slate-700">
+                  <span className="text-xs text-slate-500 italic">
+                    💡 Check the Predictions page to see final game results
+                  </span>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
     );
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
-        <div className="text-white text-xl">Loading your parlays...</div>
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 py-8">
+        <div className="max-w-6xl mx-auto px-4">
+          <div className="text-center text-slate-400">Loading your parlays...</div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 py-8">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 py-6">
       <div className="max-w-6xl mx-auto px-4">
-
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-4xl font-bold text-white mb-2">🏆 My Parlays</h1>
-            <p className="text-slate-400">Track your parlay performance</p>
-          </div>
-          <Link
-            href="/parlay-builder"
-            className="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 rounded-lg font-semibold transition-all"
-          >
-            ➕ Create New Parlay
-          </Link>
+        {/* Compact Header */}
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold text-white mb-1">My Parlays</h1>
+          <p className="text-slate-400 text-sm">Track your predictions and performance</p>
         </div>
 
-        {/* User Stats */}
+        {/* Compact User Stats */}
         {userStats && (
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-            <div className="bg-slate-900 border border-slate-800 rounded-lg p-4">
-              <div className="text-slate-400 text-sm mb-1">Total Parlays</div>
-              <div className="text-white text-3xl font-bold">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+            <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-3">
+              <div className="text-slate-400 text-xs mb-1">Total Parlays</div>
+              <div className="text-xl font-bold text-white">
                 {userStats.total_parlays || 0}
               </div>
             </div>
-            <div className="bg-slate-900 border border-slate-800 rounded-lg p-4">
-              <div className="text-slate-400 text-sm mb-1">Wins</div>
-              <div className="text-emerald-400 text-3xl font-bold">
+            <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-3">
+              <div className="text-slate-400 text-xs mb-1">Wins</div>
+              <div className="text-xl font-bold text-green-400">
                 {userStats.total_wins || 0}
               </div>
             </div>
-            <div className="bg-slate-900 border border-slate-800 rounded-lg p-4">
-              <div className="text-slate-400 text-sm mb-1">Win Rate</div>
-              <div className="text-white text-3xl font-bold">
-                {userStats.win_rate ? `${(userStats.win_rate * 100).toFixed(1)}%` : '0%'}
+            <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-3">
+              <div className="text-slate-400 text-xs mb-1">Win Rate</div>
+              <div className="text-xl font-bold text-blue-400">
+                {userStats.win_rate ? `${userStats.win_rate}%` : '0%'}
               </div>
             </div>
-            <div className="bg-slate-900 border border-slate-800 rounded-lg p-4">
-              <div className="text-slate-400 text-sm mb-1">Current Streak</div>
-              <div className="text-yellow-400 text-3xl font-bold">
-                {userStats.current_streak || 0} 🔥
+            <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-3">
+              <div className="text-slate-400 text-xs mb-1">Avg Legs</div>
+              <div className="text-xl font-bold text-purple-400">
+                {userStats.avg_leg_count || '0'}
               </div>
             </div>
           </div>
         )}
 
-        {/* Filter Buttons */}
-        <div className="flex space-x-2 mb-6">
-          {['all', 'pending', 'won', 'lost'].map((status) => (
-            <button
-              key={status}
-              onClick={() => setFilter(status)}
-              className={`px-4 py-2 rounded-lg font-semibold transition-all ${filter === status
-                ? 'bg-emerald-600 text-white'
-                : 'bg-slate-900 border border-slate-800 text-slate-300 hover:bg-slate-800'
+        {/* Compact Filter Tabs and Create Button - SAME ROW */}
+        <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+          <div className="flex gap-2 flex-wrap">
+            {['all', 'pending', 'won', 'lost'].map(status => (
+              <button
+                key={status}
+                onClick={() => setFilter(status)}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium capitalize transition-colors ${
+                  filter === status
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
                 }`}
-            >
-              {status.charAt(0).toUpperCase() + status.slice(1)}
-            </button>
-          ))}
+              >
+                {status}
+              </button>
+            ))}
+          </div>
+          
+          <Link
+            href="/parlay-builder"
+            className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-5 py-2 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity"
+          >
+            + Create New Parlay
+          </Link>
         </div>
 
-        {/* Parlays List */}
+        {/* Parlays Grid - NARROW CARDS WITH MAX WIDTH */}
         {filteredParlays.length === 0 ? (
-          <div className="bg-slate-900 border border-slate-800 rounded-lg p-12 text-center">
-            <div className="text-6xl mb-4">🎲</div>
-            <h2 className="text-2xl font-bold text-white mb-2">
-              {filter === 'all' ? 'No parlays yet' : `No ${filter} parlays`}
-            </h2>
-            <p className="text-slate-400 mb-6">
-              {filter === 'all'
-                ? 'Create your first parlay to get started!'
-                : `You don't have any ${filter} parlays.`}
-            </p>
+          <div className="bg-slate-800/30 border border-slate-700 rounded-lg p-8 text-center max-w-2xl mx-auto">
+            <div className="text-slate-400 mb-3 text-sm">
+              {filter === 'all' 
+                ? "You haven't created any parlays yet" 
+                : `No ${filter} parlays found`}
+            </div>
             <Link
               href="/parlay-builder"
-              className="inline-block bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-3 rounded-lg font-semibold transition-all"
+              className="inline-block bg-blue-600 text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors"
             >
               Create Your First Parlay
             </Link>
           </div>
         ) : (
-          <div className="space-y-4">
-            {filteredParlays.map((parlay) => (
-              <div
-                key={parlay.id}
-                className="bg-slate-900 border border-slate-800 rounded-lg p-6"
-              >
-                <div className="flex items-start justify-between mb-4">
-                  <div>
-                    <h3 className="text-xl font-bold text-white mb-1">
-                      {parlay.parlay_name}
-                    </h3>
-                    <p className="text-sm text-slate-400">
-                      Week {parlay.week} • {parlay.season} • {parlay.leg_count} legs
-                    </p>
-                  </div>
-                  <div className="flex items-center space-x-3">
-                    {getStatusBadge(parlay.status)}
-                    <button
-                      onClick={() => deleteParlay(parlay.id)}
-                      className="text-red-400 hover:text-red-300"
-                    >
-                      🗑️
-                    </button>
-                  </div>
-                </div>
-
-                {/* Probability & Results */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                  <div className="bg-slate-800 rounded p-3">
-                    <div className="text-xs text-slate-400 mb-1">AI Probability</div>
-                    <div className="text-white font-bold">
-                      {parlay.combined_ai_probability ? `${parseFloat(parlay.combined_ai_probability).toFixed(1)}%` : 'N/A'}
-                    </div>
-                  </div>
-                  <div className="bg-slate-800 rounded p-3">
-                    <div className="text-xs text-slate-400 mb-1">Risk Level</div>
-                    <div className="text-white font-bold">{parlay.risk_level || 'N/A'}</div>
-                  </div>
-                  <div className="bg-slate-800 rounded p-3">
-                    <div className="text-xs text-slate-400 mb-1">Correct Picks</div>
-                    <div className="text-white font-bold">
-                      {parlay.correct_legs || 0} / {parlay.leg_count}
-                    </div>
-                  </div>
-                  <div className="bg-slate-800 rounded p-3">
-                    <div className="text-xs text-slate-400 mb-1">Created</div>
-                    <div className="text-white font-bold text-sm">
-                      {new Date(parlay.created_at).toLocaleDateString()}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Picks */}
-                <div className="space-y-2">
-                  {parlay.games && typeof parlay.games === 'string' && JSON.parse(parlay.games).map((game, index) => (
-                    <div
-                      key={index}
-                      className="bg-slate-800/50 rounded p-3 flex items-center justify-between"
-                    >
-                      <div className="text-white">
-                        <span className="font-semibold">{game.picked_winner}</span>
-                        <span className="text-slate-400 text-sm ml-2">
-                          ({game.away_team} @ {game.home_team})
-                        </span>
+          <div className="flex flex-wrap gap-4 justify-start">
+            {filteredParlays.map(parlay => {
+              const isExpanded = expandedParlays.has(parlay.id);
+              
+              return (
+                <div
+                  key={parlay.id}
+                  className="bg-slate-800/50 border border-slate-700 rounded-lg p-4 hover:border-slate-600 transition-colors w-full sm:w-[calc(50%-0.5rem)] lg:w-[calc(33.333%-0.67rem)] max-w-md"
+                >
+                  {/* Compact Parlay Header */}
+                  <div className="flex items-start justify-between mb-3">
+                    <div>
+                      <h3 className="text-lg font-semibold text-white mb-1">
+                        {parlay.parlay_name}
+                      </h3>
+                      <div className="flex items-center gap-2 text-xs text-slate-400">
+                        <span>Season {parlay.season}</span>
+                        <span>•</span>
+                        <span>Week {parlay.week}</span>
+                        <span>•</span>
+                        <span>{parlay.leg_count} Legs</span>
                       </div>
-                      {game.result && (
-                        <span className={`text-sm font-semibold ${game.result === 'correct' ? 'text-emerald-400' : 'text-red-400'
-                          }`}>
-                          {game.result === 'correct' ? '✓ Correct' : '✗ Wrong'}
-                        </span>
-                      )}
                     </div>
-                  ))}
+                    <div className="flex items-center gap-2">
+                      <span className={getStatusBadge(parlay.status)}>
+                        {parlay.status}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Improved Stats Row - Risk Left, Probability Center, Cost Right */}
+                  <div className="grid grid-cols-3 gap-3 mb-3">
+                    <div>
+                      <div className="text-slate-500 text-xs mb-0.5">Risk Level</div>
+                      <span className={getRiskBadge(parlay.risk_level)}>
+                        {parlay.risk_level}
+                      </span>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-slate-500 text-xs mb-0.5">Combined Probability</div>
+                      <div className="text-white font-semibold text-sm">
+                        {formatProbability(parlay.combined_ai_probability)}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-slate-500 text-xs mb-0.5">Cost</div>
+                      <div className="text-white font-semibold text-sm">
+                        {parlay.is_hit !== null 
+                          ? `${parlay.legs_hit || 0}/${parlay.leg_count}`
+                          : `${parlay.sms_bucks_cost || 0} SMS`}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Compact Expand/Collapse Button */}
+                  <button
+                    onClick={() => toggleExpanded(parlay.id)}
+                    className="w-full bg-slate-900/50 hover:bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs font-medium text-slate-300 transition-colors mb-3 flex items-center justify-center gap-1.5"
+                  >
+                    {isExpanded ? (
+                      <>
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                        Hide Pick Details
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                        Show Pick Details
+                      </>
+                    )}
+                  </button>
+
+                  {/* Expandable Pick Details */}
+                  {isExpanded && renderPickDetails(parlay)}
+
+                  {/* Compact Actions */}
+                  <div className="flex gap-2 pt-3 border-t border-slate-700 items-center">
+                    {parlay.is_hit === null && (
+                      <button
+                        onClick={() => deleteParlay(parlay.id)}
+                        className="px-3 py-1.5 bg-red-600/20 hover:bg-red-600/30 text-red-400 rounded-lg text-xs font-medium transition-colors"
+                      >
+                        Delete
+                      </button>
+                    )}
+                    <div className="text-xs text-slate-500 flex items-center">
+                      Created {new Date(parlay.created_at).toLocaleDateString()}
+                    </div>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
-
       </div>
     </div>
   );
