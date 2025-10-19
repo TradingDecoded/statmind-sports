@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../contexts/AuthContext';
+import { useSMSBucks } from '../../contexts/SMSBucksContext';
 
 export default function ParlayBuilderPage() {
   const router = useRouter();
@@ -17,6 +18,7 @@ export default function ParlayBuilderPage() {
   const [error, setError] = useState(null);
   const [currentWeek, setCurrentWeek] = useState(null);
   const [currentSeason, setCurrentSeason] = useState(2025);
+  const { refreshBalance } = useSMSBucks();
 
   // Team logo mapping (using ESPN CDN)
   const getTeamLogo = (teamName) => {
@@ -235,6 +237,7 @@ export default function ParlayBuilderPage() {
       });
 
       const responseData = await response.json();
+      refreshBalance();
       console.log('💾 Response:', responseData);
 
       if (!response.ok) {

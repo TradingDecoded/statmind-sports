@@ -1,62 +1,21 @@
 'use client';
-import { useState, useEffect } from 'react';
-import { useAuth } from '../contexts/AuthContext';
+import { useSMSBucks } from '../contexts/SMSBucksContext';
 import { useRouter } from 'next/navigation';
 
 export default function SMSBucksDisplay() {
-  const { user } = useAuth();
+  const { balance, tier, loading } = useSMSBucks();
   const router = useRouter();
-  const [balance, setBalance] = useState(null);
-  const [tier, setTier] = useState('free');
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (user) {
-      fetchBalance();
-    } else {
-      setLoading(false);
-    }
-  }, [user]);
-
-  const fetchBalance = async () => {
-    try {
-      const token = localStorage.getItem('authToken');
-      
-      if (!token) {
-        setLoading(false);
-        return;
-      }
-
-      const response = await fetch('/api/sms-bucks/balance', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setBalance(data.balance);
-        setTier(data.tier);
-      }
-    } catch (error) {
-      console.error('Error fetching SMS Bucks balance:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleClick = () => {
     if (tier === 'free') {
-      // Free users go to upgrade page
       router.push('/upgrade');
     } else {
-      // Premium/VIP users go to transaction history
       router.push('/sms-bucks/transactions');
     }
   };
 
-  // Don't render if no user
-  if (!user || loading || balance === null) {
+  // Don't render if loading or no balance
+  if (loading || balance === null) {
     return null;
   }
 

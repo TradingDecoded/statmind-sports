@@ -2,13 +2,13 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useRouter } from 'next/navigation';
+import { useSMSBucks } from '../../../contexts/SMSBucksContext';
 
 export default function TransactionHistoryPage() {
   const { user } = useAuth();
+  const { balance, tier } = useSMSBucks();
   const router = useRouter();
   const [transactions, setTransactions] = useState([]);
-  const [balance, setBalance] = useState(0);
-  const [tier, setTier] = useState('free');
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
@@ -23,40 +23,29 @@ export default function TransactionHistoryPage() {
   }, [user]);
 
   const fetchData = async () => {
-    try {
-      const token = localStorage.getItem('authToken');
-      
-      if (!token) {
-        router.push('/login');
-        return;
-      }
-
-      // Fetch balance
-      const balanceRes = await fetch('/api/sms-bucks/balance', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      
-      if (balanceRes.ok) {
-        const balanceData = await balanceRes.json();
-        setBalance(balanceData.balance);
-        setTier(balanceData.tier);
-      }
-
-      // Fetch transactions
-      const transRes = await fetch('/api/sms-bucks/transactions?limit=100', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-
-      if (transRes.ok) {
-        const transData = await transRes.json();
-        setTransactions(transData.transactions || []);
-      }
-    } catch (error) {
-      console.error('Error fetching data:', error);
-    } finally {
-      setLoading(false);
+  try {
+    const token = localStorage.getItem('authToken');
+    
+    if (!token) {
+      router.push('/login');
+      return;
     }
-  };
+
+    // Fetch transactions only (balance comes from context)
+    const transRes = await fetch('/api/sms-bucks/transactions?limit=100', {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+
+    if (transRes.ok) {
+      const transData = await transRes.json();
+      setTransactions(transData.transactions || []);
+    }
+  } catch (error) {
+    console.error('Error fetching data:', error);
+  } finally {
+    setLoading(false);
+  }
+};
 
   // Filter transactions
   const filteredTransactions = transactions.filter(t => {
@@ -76,9 +65,9 @@ export default function TransactionHistoryPage() {
   // Format date
   const formatDate = (dateString) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { 
-      month: 'short', 
-      day: 'numeric', 
+    return date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
       year: 'numeric',
       hour: '2-digit',
       minute: '2-digit'
@@ -114,7 +103,7 @@ export default function TransactionHistoryPage() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-900 to-slate-800 py-8 px-4">
       <div className="max-w-5xl mx-auto">
-        
+
         {/* Header with Balance */}
         <div className="bg-gradient-to-r from-emerald-500 to-teal-600 rounded-2xl p-8 mb-8 shadow-xl">
           <div className="flex items-center justify-between">
@@ -137,31 +126,28 @@ export default function TransactionHistoryPage() {
         <div className="flex gap-3 mb-6">
           <button
             onClick={() => { setFilter('all'); setCurrentPage(1); }}
-            className={`px-6 py-2 rounded-lg font-medium transition-all ${
-              filter === 'all' 
-                ? 'bg-emerald-500 text-white shadow-lg' 
-                : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-            }`}
+            className={`px-6 py-2 rounded-lg font-medium transition-all ${filter === 'all'
+              ? 'bg-emerald-500 text-white shadow-lg'
+              : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+              }`}
           >
             All Transactions
           </button>
           <button
             onClick={() => { setFilter('earned'); setCurrentPage(1); }}
-            className={`px-6 py-2 rounded-lg font-medium transition-all ${
-              filter === 'earned' 
-                ? 'bg-green-500 text-white shadow-lg' 
-                : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-            }`}
+            className={`px-6 py-2 rounded-lg font-medium transition-all ${filter === 'earned'
+              ? 'bg-green-500 text-white shadow-lg'
+              : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+              }`}
           >
             💰 Earned
           </button>
           <button
             onClick={() => { setFilter('spent'); setCurrentPage(1); }}
-            className={`px-6 py-2 rounded-lg font-medium transition-all ${
-              filter === 'spent' 
-                ? 'bg-red-500 text-white shadow-lg' 
-                : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-            }`}
+            className={`px-6 py-2 rounded-lg font-medium transition-all ${filter === 'spent'
+              ? 'bg-red-500 text-white shadow-lg'
+              : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+              }`}
           >
             💸 Spent
           </button>
@@ -198,7 +184,7 @@ export default function TransactionHistoryPage() {
                       </div>
                     </div>
                   </div>
-                  
+
                   <div className="text-right">
                     <div className={`text-2xl font-bold ${getAmountColor(transaction.amount)}`}>
                       {transaction.amount > 0 ? '+' : ''}{transaction.amount}
@@ -223,17 +209,16 @@ export default function TransactionHistoryPage() {
             >
               ← Previous
             </button>
-            
+
             <div className="flex gap-2">
               {[...Array(totalPages)].map((_, i) => (
                 <button
                   key={i}
                   onClick={() => setCurrentPage(i + 1)}
-                  className={`w-10 h-10 rounded-lg font-medium ${
-                    currentPage === i + 1
-                      ? 'bg-emerald-500 text-white'
-                      : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                  }`}
+                  className={`w-10 h-10 rounded-lg font-medium ${currentPage === i + 1
+                    ? 'bg-emerald-500 text-white'
+                    : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                    }`}
                 >
                   {i + 1}
                 </button>

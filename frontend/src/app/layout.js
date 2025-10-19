@@ -2,6 +2,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Navigation from "../components/Navigation";
 import { AuthProvider } from "../contexts/AuthContext";
+import { SMSBucksProvider } from '../contexts/SMSBucksContext';
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -23,8 +24,10 @@ export default function RootLayout({ children }) {
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <AuthProvider>
-          <Navigation />
-          <main>{children}</main>
+          <SMSBucksProvider>
+            <Navigation />
+            <main>{children}</main>
+          </SMSBucksProvider>
         </AuthProvider>
       </body>
     </html>

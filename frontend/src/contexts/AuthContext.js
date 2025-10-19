@@ -13,7 +13,7 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     const checkAuth = async () => {
       const token = localStorage.getItem('authToken');
-      
+
       if (token) {
         try {
           // Verify token and get fresh user data
@@ -22,7 +22,7 @@ export function AuthProvider({ children }) {
               'Authorization': `Bearer ${token}`
             }
           });
-          
+
           if (response.ok) {
             const data = await response.json();
             // Force update both state AND localStorage
@@ -41,10 +41,10 @@ export function AuthProvider({ children }) {
           setUser(null);
         }
       }
-      
+
       setIsLoading(false);
     };
-    
+
     checkAuth();
   }, []);
 
@@ -52,8 +52,7 @@ export function AuthProvider({ children }) {
     localStorage.setItem('authToken', token);
     localStorage.setItem('user', JSON.stringify(userData));
     setUser(userData);
-    // Force navigation re-render by reloading
-    window.location.reload();
+    // No reload needed - state update handles it
   };
 
   const logout = () => {
