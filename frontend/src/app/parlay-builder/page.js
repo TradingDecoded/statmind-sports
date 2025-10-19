@@ -5,6 +5,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useSMSBucks } from '../../contexts/SMSBucksContext';
 import { formatShortGameDateTime } from '@/utils/dateTimeUtils';
 import { getTeamLogo } from '@/utils/teamLogos';
+import CompetitionStatusBanner from '../../components/CompetitionStatusBanner';
 
 export default function ParlayBuilderPage() {
   const router = useRouter();
@@ -21,6 +22,7 @@ export default function ParlayBuilderPage() {
   const [currentWeek, setCurrentWeek] = useState(null);
   const [currentSeason, setCurrentSeason] = useState(2025);
   const { refreshBalance } = useSMSBucks();
+  const [competitionStatus, setCompetitionStatus] = useState(null);
 
   useEffect(() => {
     // Don't redirect while still checking auth
@@ -62,6 +64,23 @@ export default function ParlayBuilderPage() {
     }
   };
 
+  const fetchCompetitionStatus = async () => {
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://statmindsports.com/api';
+      const response = await fetch(`${apiUrl}/competition/status`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      const data = await response.json();
+      if (data.success) {
+        setCompetitionStatus(data.status);
+      }
+    } catch (error) {
+      console.error('Error fetching competition status:', error);
+    }
+  };
+
   const toggleGamePick = (game, pickedWinner) => {
     setSelectedPicks(prevPicks => {
       const existingIndex = prevPicks.findIndex(p => p.game_id === game.id);
@@ -99,6 +118,11 @@ export default function ParlayBuilderPage() {
       setCalculatedProb(null);
     }
   }, [selectedPicks]);
+
+  useEffect(() => {
+    fetchAvailableGames();
+    fetchCompetitionStatus();
+  }, [currentWeek]);
 
   const calculateProbability = async () => {
     if (selectedPicks.length < 2) return;
@@ -243,6 +267,9 @@ export default function ParlayBuilderPage() {
             Create your custom parlay for Week {currentWeek} • Select 2+ games
           </p>
         </div>
+
+        {/* Competition Status Banner */}
+        {competitionStatus && <CompetitionStatusBanner status={competitionStatus} />}
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
 
