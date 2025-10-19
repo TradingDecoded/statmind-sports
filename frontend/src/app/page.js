@@ -14,6 +14,7 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
   const [statsLoading, setStatsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [currentWeek, setCurrentWeek] = useState(null);
 
   useEffect(() => {
     loadPredictions();
@@ -25,61 +26,69 @@ export default function HomePage() {
       setLoading(true);
       setError(null);
 
-      // Fetch ALL upcoming predictions
-      const data = await fetchUpcomingPredictions(50);
+      // Determine the current week
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://statmindsports.com/api';
 
-      console.log('📊 Total predictions fetched:', data.length);
+      const now = new Date();
+      const seasonStartDate = new Date(2025, 8, 4); // Sept 4, 2025
+      const daysSinceStart = Math.floor((now - seasonStartDate) / (1000 * 60 * 60 * 24));
+      let currentWeek = Math.floor(daysSinceStart / 7) + 1;
 
-      if (data.length === 0) {
-        console.log('❌ No predictions available at all');
-        setPredictions([]);
-        return;
+      if (currentWeek < 1) currentWeek = 1;
+      if (currentWeek > 18) currentWeek = 18;
+
+      console.log(`📅 Current Week: ${currentWeek}`);
+      setCurrentWeek(currentWeek);
+
+      // Fetch ALL predictions for the current week (includes both upcoming and completed)
+      const response = await fetch(`${API_BASE_URL}/predictions/week/2025/${currentWeek}`);
+      const data = await response.json();
+
+      if (!data.success || !data.predictions) {
+        throw new Error('Failed to load predictions');
       }
 
-      // Log first few predictions to see structure
-      console.log('📋 Sample predictions:', data.slice(0, 3).map(p => ({
-        week: p.week,
-        season: p.season,
-        confidence: p.confidence,
-        gameId: p.gameId
-      })));
+      console.log('📊 Total predictions for this week:', data.predictions.length);
 
-      // Get the EARLIEST upcoming week available in the data
-      const upcomingWeeks = data.map(p => p.week).filter(w => w);
-      const nextWeek = Math.min(...upcomingWeeks);
-      const season = 2025;
+      // Filter for HIGH confidence games ONLY
+      const highConfidencePicks = data.predictions.filter(pred =>
+        pred.confidence && pred.confidence.toUpperCase() === 'HIGH'
+      );
 
-      console.log(`📅 Next upcoming week in data: Week ${nextWeek}`);
+      console.log('🎯 High confidence picks:', highConfidencePicks.length);
 
-      // Filter for next upcoming week and HIGH confidence
-      const nextWeekHighConfidence = data.filter(pred => {
-        const isNextWeek = pred.week === nextWeek;
-        const isHighConfidence = pred.confidence && pred.confidence.toLowerCase() === 'high';
-        return isNextWeek && isHighConfidence;
-      });
+      // Check if ALL high confidence games are completed
+      const allCompleted = highConfidencePicks.every(pred => pred.isFinal);
 
-      // Get ALL games from next week for breakdown
-      const nextWeekGames = data.filter(p => p.week === nextWeek);
+      if (allCompleted && highConfidencePicks.length > 0) {
+        console.log('✅ All high confidence games completed, loading NEXT week...');
 
-      console.log('🎯 Confidence breakdown for Week', nextWeek, ':', {
-        total: nextWeekGames.length,
-        high: nextWeekGames.filter(p => p.confidence?.toLowerCase() === 'high').length,
-        medium: nextWeekGames.filter(p => p.confidence?.toLowerCase() === 'medium').length,
-        low: nextWeekGames.filter(p => p.confidence?.toLowerCase() === 'low').length
-      });
+        // Load next week's predictions
+        const nextWeek = currentWeek + 1;
+        if (nextWeek <= 18) {
+          const nextWeekResponse = await fetch(`${API_BASE_URL}/predictions/week/2025/${nextWeek}`);
+          const nextWeekData = await nextWeekResponse.json();
 
-      console.log('✅ High confidence games found:', nextWeekHighConfidence.length);
+          if (nextWeekData.success && nextWeekData.predictions) {
+            const nextWeekHighConfidence = nextWeekData.predictions.filter(pred =>
+              pred.confidence && pred.confidence.toUpperCase() === 'HIGH'
+            );
 
-      // Show high confidence games, or all games if no high confidence
-      if (nextWeekHighConfidence.length === 0) {
-        console.log('⚠️ No high confidence games, showing all games from Week', nextWeek);
-        setPredictions(nextWeekGames);
-      } else {
-        setPredictions(nextWeekHighConfidence);
+            console.log(`📅 Loaded Week ${nextWeek} high confidence picks:`, nextWeekHighConfidence.length);
+            setCurrentWeek(nextWeek);
+            setPredictions(nextWeekHighConfidence);
+            return;
+          }
+        }
       }
+
+      // Show current week's high confidence picks (mix of upcoming and completed)
+      setPredictions(highConfidencePicks);
+
     } catch (err) {
       console.error('❌ Error loading predictions:', err);
-      setError('Failed to load predictions. Please try again later.');
+      setError('Failed to load predictions. Please try again.');
+      setPredictions([]);
     } finally {
       setLoading(false);
     }
@@ -184,7 +193,7 @@ export default function HomePage() {
           <div className="text-center mb-12">
             <h2 className="text-4xl font-bold mb-4">This Week's Top Picks</h2>
             <p className="text-slate-400 text-lg">
-              Our <span className="text-emerald-400 font-semibold">high confidence</span> predictions for the upcoming games
+              Our <span className="text-emerald-400 font-semibold">high confidence</span> predictions for {currentWeek ? `Week ${currentWeek}` : 'the upcoming games'}
             </p>
           </div>
 
