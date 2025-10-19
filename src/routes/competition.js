@@ -4,8 +4,9 @@
 // ============================================
 
 import express from 'express';
-import { requireAuth } from '../middleware/authMiddleware.js';
+import { requireAuth, optionalAuth } from '../middleware/authMiddleware.js';
 import competitionService from '../services/competitionService.js';
+import pool from '../config/database.js';
 
 const router = express.Router();
 
