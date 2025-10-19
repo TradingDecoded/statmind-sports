@@ -43,6 +43,11 @@ export const NFL_TEAMS = {
  * Get team logo URL from ESPN
  */
 export function getTeamLogo(teamKey) {
+  // Special case: Washington hosted locally for reliability
+  if (teamKey === 'WAS' || teamKey === 'WSH') {
+    return '/images/commanders-logo.png';
+  }
+
   const espnTeamIds = {
     'ARI': '22', 'ATL': '1', 'BAL': '33', 'BUF': '2',
     'CAR': '29', 'CHI': '3', 'CIN': '4', 'CLE': '5',
@@ -53,11 +58,11 @@ export function getTeamLogo(teamKey) {
     'NYJ': '20', 'PHI': '21', 'PIT': '23', 'SEA': '26',
     'SF': '25', 'TB': '27', 'TEN': '10', 'WAS': '28'
   };
-  
+
   const espnId = espnTeamIds[teamKey];
-  return espnId 
+  return espnId
     ? `https://a.espncdn.com/i/teamlogos/nfl/500/${espnId}.png`
-    : '/placeholder-team-logo.png';
+    : '/images/nfl-logo.png';
 }
 
 /**

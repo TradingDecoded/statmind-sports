@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSMSBucks } from '../../contexts/SMSBucksContext';
 import { formatShortGameDateTime } from '@/utils/dateTimeUtils';
+import { getTeamLogo } from '@/utils/teamLogos';
 
 export default function ParlayBuilderPage() {
   const router = useRouter();
@@ -20,47 +21,6 @@ export default function ParlayBuilderPage() {
   const [currentWeek, setCurrentWeek] = useState(null);
   const [currentSeason, setCurrentSeason] = useState(2025);
   const { refreshBalance } = useSMSBucks();
-
-  // Team logo mapping (using ESPN CDN)
-  const getTeamLogo = (teamName) => {
-    const teamAbbreviations = {
-      'Kansas City Chiefs': 'KC',
-      'Buffalo Bills': 'BUF',
-      'Baltimore Ravens': 'BAL',
-      'Cincinnati Bengals': 'CIN',
-      'Cleveland Browns': 'CLE',
-      'Pittsburgh Steelers': 'PIT',
-      'Houston Texans': 'HOU',
-      'Indianapolis Colts': 'IND',
-      'Jacksonville Jaguars': 'JAX',
-      'Tennessee Titans': 'TEN',
-      'Denver Broncos': 'DEN',
-      'Las Vegas Raiders': 'LV',
-      'Los Angeles Chargers': 'LAC',
-      'Miami Dolphins': 'MIA',
-      'New England Patriots': 'NE',
-      'New York Jets': 'NYJ',
-      'Dallas Cowboys': 'DAL',
-      'New York Giants': 'NYG',
-      'Philadelphia Eagles': 'PHI',
-      'Washington Commanders': 'WAS',
-      'Chicago Bears': 'CHI',
-      'Detroit Lions': 'DET',
-      'Green Bay Packers': 'GB',
-      'Minnesota Vikings': 'MIN',
-      'Atlanta Falcons': 'ATL',
-      'Carolina Panthers': 'CAR',
-      'New Orleans Saints': 'NO',
-      'Tampa Bay Buccaneers': 'TB',
-      'Arizona Cardinals': 'ARI',
-      'Los Angeles Rams': 'LAR',
-      'San Francisco 49ers': 'SF',
-      'Seattle Seahawks': 'SEA'
-    };
-
-    const abbr = teamAbbreviations[teamName];
-    return abbr ? `https://a.espncdn.com/i/teamlogos/nfl/500/${abbr}.png` : null;
-  };
 
   useEffect(() => {
     // Don't redirect while still checking auth
