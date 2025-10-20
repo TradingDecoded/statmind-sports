@@ -74,7 +74,8 @@ export default function MyParlaysPage() {
   };
 
   const deleteParlay = async (parlayId) => {
-    if (!confirm('Are you sure you want to delete this parlay?')) return;
+    if (!confirm('Are you sure you want to delete this parlay? This action cannot be undone.'))
+      return;
 
     try {
       const token = localStorage.getItem('authToken');
@@ -85,17 +86,29 @@ export default function MyParlaysPage() {
         }
       });
 
-      if (!response.ok) throw new Error('Failed to delete');
+      const data = await response.json();
 
+      // Check if parlay is locked
+      if (!response.ok) {
+        if (data.locked) {
+          // Show specific message about parlay being locked
+          alert(`🔒 Parlay Locked\n\n${data.message}`);
+        } else {
+          alert(`Failed to delete parlay: ${data.error || 'Unknown error'}`);
+        }
+        return;
+      }
+
+      // Successfully deleted
       setParlays(prevParlays => prevParlays.filter(p => p.id !== parlayId));
       router.refresh();
       await fetchMyParlays();
       await fetchUserStats();
 
-      alert('Parlay deleted successfully');
+      alert('✅ Parlay deleted successfully');
     } catch (err) {
       console.error('Delete error:', err);
-      alert('Failed to delete parlay');
+      alert('Failed to delete parlay. Please try again.');
       fetchMyParlays();
     }
   };
@@ -109,6 +122,26 @@ export default function MyParlaysPage() {
         newSet.add(parlayId);
       }
       return newSet;
+    });
+  };
+
+  // Check if parlay is locked (any game has started or is in progress)
+  const isParlayLocked = (parlay) => {
+    if (!parlay.games || parlay.games.length === 0) return false;
+
+    const now = new Date();
+
+    // Check if ANY game has started (either by date or by status)
+    return parlay.games.some(game => {
+      const gameDate = new Date(game.game_date);
+
+      // Check status if available
+      if (game.status && (game.status === 'in_progress' || game.status === 'final')) {
+        return true;
+      }
+
+      // Also check if game date has passed
+      return gameDate <= now;
     });
   };
 
@@ -541,12 +574,19 @@ export default function MyParlaysPage() {
                   {/* Compact Actions */}
                   <div className="flex gap-2 pt-3 border-t border-slate-700 items-center">
                     {parlay.is_hit === null && (
-                      <button
-                        onClick={() => deleteParlay(parlay.id)}
-                        className="px-3 py-1.5 bg-red-600/20 hover:bg-red-600/30 text-red-400 rounded-lg text-xs font-medium transition-colors"
-                      >
-                        Delete
-                      </button>
+                      isParlayLocked(parlay) ? (
+                        <div className="flex items-center gap-1.5 text-slate-500 text-xs">
+                          <span>🔒</span>
+                          <span>Locked</span>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => deleteParlay(parlay.id)}
+                          className="px-3 py-1.5 bg-red-600/20 hover:bg-red-600/30 text-red-400 rounded-lg text-xs font-medium transition-colors"
+                        >
+                          Delete
+                        </button>
+                      )
                     )}
                     <div className="text-xs text-slate-500 flex items-center">
                       Created {new Date(parlay.created_at).toLocaleDateString()}

@@ -391,7 +391,7 @@ class ParlayService {
               console.log(`🔍 Looking for game_id: ${game.game_id}`);
 
               const gameResult = await pool.query(
-                `SELECT home_team, away_team, home_score, away_score, is_final
+                `SELECT home_team, away_team, home_score, away_score, is_final, status, game_date
                  FROM games
                  WHERE id = $1`,
                 [game.game_id]
@@ -428,10 +428,13 @@ class ParlayService {
 
               return {
                 ...game,
+                status: gameData.status,
+                game_date: gameData.game_date,
                 gameData: {
                   home_score: gameData.home_score,
                   away_score: gameData.away_score,
                   is_final: gameData.is_final,
+                  status: gameData.status,
                   actual_winner: actualWinner,
                   is_correct: isCorrect
                 }

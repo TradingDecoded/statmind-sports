@@ -210,7 +210,7 @@ router.get('/:id', requireAuth, async (req, res) => {
 
 // ==========================================
 // DELETE /api/parlay/:id
-// Delete a parlay permanently
+// Delete a parlay permanently (only if games haven't started)
 // ==========================================
 router.delete('/:id', requireAuth, async (req, res) => {
   try {
@@ -219,9 +219,11 @@ router.delete('/:id', requireAuth, async (req, res) => {
 
     console.log(`🗑️  Delete request for parlay ${parlayId} by user ${userId}`);
 
-    // Make sure parlay belongs to this user
+    // Make sure parlay belongs to this user and get picks
     const checkResult = await pool.query(
-      'SELECT user_id, is_hit FROM user_parlays WHERE id = $1',
+      `SELECT user_id, is_hit, picks 
+       FROM user_parlays 
+       WHERE id = $1`,
       [parlayId]
     );
 
@@ -240,6 +242,52 @@ router.delete('/:id', requireAuth, async (req, res) => {
     }
 
     const parlayStatus = checkResult.rows[0].is_hit;
+    const picks = checkResult.rows[0].picks;
+
+    // ==========================================
+    // PARLAY LOCKING: Check if any game has started
+    // ==========================================
+    if (picks && picks.length > 0) {
+      // Get all game IDs from the parlay
+      const gameIds = picks.map(pick => pick.game_id);
+
+      // Check if ANY game has already started (status is not 'scheduled')
+      const gameStatusCheck = await pool.query(
+        `SELECT id, game_date, status,
+                CASE 
+                  WHEN status IN ('in_progress', 'final') THEN true
+                  WHEN status = 'scheduled' AND game_date <= NOW() THEN true
+                  ELSE false 
+                END as has_started
+         FROM games 
+         WHERE id = ANY($1::int[])
+         ORDER BY game_date ASC`,
+        [gameIds]
+      );
+
+      // Find if any game has started
+      const anyGameStarted = gameStatusCheck.rows.some(game => game.has_started);
+
+      if (anyGameStarted) {
+        // Get the first game that started for the error message
+        const firstGameStarted = gameStatusCheck.rows.find(game => game.has_started);
+
+        console.log(`🔒 Cannot delete parlay ${parlayId} - games have started (status: ${firstGameStarted.status})`);
+
+        return res.status(403).json({
+          success: false,
+          error: 'Cannot delete parlay after games have started',
+          locked: true,
+          first_game_started: firstGameStarted.game_date,
+          first_game_status: firstGameStarted.status,
+          message: 'This parlay is locked because at least one game has already started. Parlays cannot be deleted after the first game begins.'
+        });
+      }
+    }
+
+    // ==========================================
+    // Parlay is unlocked - proceed with deletion
+    // ==========================================
 
     // Delete the parlay
     await pool.query('DELETE FROM user_parlays WHERE id = $1', [parlayId]);
