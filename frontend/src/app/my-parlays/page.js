@@ -40,6 +40,13 @@ export default function MyParlaysPage() {
       if (!response.ok) throw new Error('Failed to fetch');
 
       const data = await response.json();
+      console.log('🔍 Fetched parlays data:', data.parlays);
+      if (data.parlays && data.parlays.length > 0) {
+        console.log('🔍 First parlay games:', data.parlays[0].games);
+        if (data.parlays[0].games && data.parlays[0].games.length > 0) {
+          console.log('🔍 First game in first parlay:', data.parlays[0].games[0]);
+        }
+      }
       setParlays(data.parlays || []);
     } catch (err) {
       setError('Failed to load parlays');
@@ -111,26 +118,26 @@ export default function MyParlaysPage() {
     if (prob === null || prob === undefined || isNaN(prob)) {
       return 'N/A';
     }
-    
+
     // Convert to number if it's a string
     const numProb = typeof prob === 'string' ? parseFloat(prob) : prob;
-    
+
     // Check again after conversion
     if (isNaN(numProb)) {
       return 'N/A';
     }
-    
+
     // If it's already a large number (like 1460), it's stored incorrectly
     // We'll divide by 100 to get the correct percentage
     if (numProb > 100) {
       return (numProb / 100).toFixed(1) + '%';
     }
-    
+
     // If it's between 0 and 1 (decimal format like 0.146)
     if (numProb <= 1) {
       return (numProb * 100).toFixed(1) + '%';
     }
-    
+
     // If it's already a percentage between 1-100
     return numProb.toFixed(1) + '%';
   };
@@ -159,6 +166,7 @@ export default function MyParlaysPage() {
   };
 
   // Render individual pick details with team logos - COMPACT VERSION
+  // Render individual pick details with team logos and GAME RESULTS
   const renderPickDetails = (parlay) => {
     if (!parlay.games || parlay.games.length === 0) {
       return (
@@ -179,113 +187,142 @@ export default function MyParlaysPage() {
           const matchup = `${game.away_team} @ ${game.home_team}`;
           const pickedTeam = game.picked_winner;
           const aiPick = game.ai_winner;
-          
+
+          // Game result data
+          const gameData = game.gameData;
+          const isFinal = gameData?.is_final || false;
+          const isCorrect = gameData?.is_correct;
+          const homeScore = gameData?.home_score;
+          const awayScore = gameData?.away_score;
+
           // Safely format AI probability
           let aiProb = 'N/A';
           if (game.ai_probability !== null && game.ai_probability !== undefined) {
-            const probNum = typeof game.ai_probability === 'string' 
-              ? parseFloat(game.ai_probability) 
+            const probNum = typeof game.ai_probability === 'string'
+              ? parseFloat(game.ai_probability)
               : game.ai_probability;
+
             if (!isNaN(probNum)) {
-              aiProb = (probNum * 100).toFixed(1);
+              if (probNum > 100) {
+                aiProb = (probNum / 100).toFixed(1);
+              } else if (probNum <= 1) {
+                aiProb = (probNum * 100).toFixed(1);
+              } else {
+                aiProb = probNum.toFixed(1);
+              }
             }
           }
-          
-          // Determine if this pick matches AI
-          const matchesAI = pickedTeam === aiPick;
-          
+
+          const matchedAI = pickedTeam === aiPick;
+
+          // Determine background color based on result
+          let bgColor = 'bg-slate-800/30'; // Default: pending
+          if (isFinal && isCorrect !== null) {
+            bgColor = isCorrect ? 'bg-green-900/20' : 'bg-red-900/20';
+          }
+
+          // Determine border color
+          let borderColor = 'border-slate-700'; // Default: pending
+          if (isFinal && isCorrect !== null) {
+            borderColor = isCorrect ? 'border-green-600/50' : 'border-red-600/50';
+          }
+
           return (
-            <div 
-              key={index} 
-              className="bg-slate-900/50 border border-slate-700 rounded-lg p-3"
+            <div
+              key={index}
+              className={`${bgColor} ${borderColor} border rounded-lg p-3`}
             >
-              {/* Compact Header */}
+              {/* Matchup Header with Team Logos */}
               <div className="flex items-center justify-between mb-2">
-                <div className="text-slate-400 text-xs font-medium">
-                  LEG {index + 1}
+                <div className="flex items-center gap-2">
+                  {/* Away Team */}
+                  <img
+                    src={getTeamLogo(game.away_team)}
+                    alt={game.away_team}
+                    className="w-6 h-6 object-contain"
+                  />
+                  <span className="text-slate-300 text-sm font-semibold">
+                    {game.away_team}
+                  </span>
+
+                  <span className="text-slate-600">@</span>
+
+                  {/* Home Team */}
+                  <img
+                    src={getTeamLogo(game.home_team)}
+                    alt={game.home_team}
+                    className="w-6 h-6 object-contain"
+                  />
+                  <span className="text-slate-300 text-sm font-semibold">
+                    {game.home_team}
+                  </span>
                 </div>
-                {matchesAI && (
-                  <span className="text-xs text-emerald-400 bg-emerald-500/20 px-2 py-0.5 rounded flex items-center gap-1">
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
+
+                {/* Result Indicator */}
+                {isFinal && isCorrect !== null && (
+                  <div className="flex items-center gap-1">
+                    {isCorrect ? (
+                      <>
+                        <span className="text-green-400 text-lg font-bold">✓</span>
+                        <span className="text-green-400 text-xs font-semibold">WIN</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-red-400 text-lg font-bold">✗</span>
+                        <span className="text-red-400 text-xs font-semibold">LOSS</span>
+                      </>
+                    )}
+                  </div>
+                )}
+
+                {!isFinal && (
+                  <span className="text-slate-500 text-xs italic">Pending</span>
+                )}
+              </div>
+
+              {/* Final Score Display */}
+              {isFinal && homeScore !== null && awayScore !== null && (
+                <div className="mb-2 py-1 px-2 bg-slate-900/50 rounded text-center">
+                  <span className="text-slate-400 text-xs font-semibold">FINAL: </span>
+                  <span className={`font-bold text-sm ${awayScore > homeScore ? 'text-white' : 'text-slate-500'
+                    }`}>
+                    {game.away_team} {awayScore}
+                  </span>
+                  <span className="text-slate-600 mx-1">-</span>
+                  <span className={`font-bold text-sm ${homeScore > awayScore ? 'text-white' : 'text-slate-500'
+                    }`}>
+                    {game.home_team} {homeScore}
+                  </span>
+                </div>
+              )}
+
+              {/* Your Pick */}
+              <div className="mb-1">
+                <span className="text-slate-500 text-xs">YOUR PICK: </span>
+                <span className={`font-bold text-sm ${isFinal && isCorrect
+                  ? 'text-green-400'
+                  : isFinal && isCorrect === false
+                    ? 'text-red-400'
+                    : 'text-blue-400'
+                  }`}>
+                  {getTeamName(pickedTeam)}
+                </span>
+                {matchedAI && (
+                  <span className="ml-2 px-2 py-0.5 bg-purple-500/20 text-purple-300 text-xs rounded border border-purple-500/50">
                     Matched AI
                   </span>
                 )}
               </div>
 
-              {/* Compact Matchup with Team Logos */}
-              <div className="flex items-center justify-between mb-2">
-                {/* Away Team */}
-                <div className={`flex items-center gap-2 ${pickedTeam === game.away_team ? 'opacity-100' : 'opacity-50'}`}>
-                  <img 
-                    src={getTeamLogo(game.away_team)} 
-                    alt={getTeamName(game.away_team)}
-                    className="w-8 h-8 object-contain"
-                    onError={(e) => {
-                      e.target.src = '/images/nfl-logo.png';
-                    }}
-                  />
-                  <div>
-                    <div className={`font-semibold text-sm ${pickedTeam === game.away_team ? 'text-white' : 'text-slate-500'}`}>
-                      {game.away_team}
-                    </div>
-                    {pickedTeam === game.away_team && (
-                      <div className="text-xs text-emerald-400 font-medium">YOUR PICK</div>
-                    )}
-                  </div>
-                </div>
-
-                {/* @ Symbol */}
-                <div className="text-slate-600 font-bold text-sm mx-1">@</div>
-
-                {/* Home Team */}
-                <div className={`flex items-center gap-2 ${pickedTeam === game.home_team ? 'opacity-100' : 'opacity-50'}`}>
-                  <div className="text-right">
-                    <div className={`font-semibold text-sm ${pickedTeam === game.home_team ? 'text-white' : 'text-slate-500'}`}>
-                      {game.home_team}
-                    </div>
-                    {pickedTeam === game.home_team && (
-                      <div className="text-xs text-emerald-400 font-medium">YOUR PICK</div>
-                    )}
-                  </div>
-                  <img 
-                    src={getTeamLogo(game.home_team)} 
-                    alt={getTeamName(game.home_team)}
-                    className="w-8 h-8 object-contain"
-                    onError={(e) => {
-                      e.target.src = '/images/nfl-logo.png';
-                    }}
-                  />
-                </div>
+              {/* AI Pick Comparison */}
+              <div className="flex items-center gap-2 text-xs">
+                <span className="text-slate-500">AI Pick:</span>
+                <span className={matchedAI ? 'text-emerald-400 font-semibold' : 'text-amber-400 font-semibold'}>
+                  {aiPick}
+                </span>
+                <span className="text-slate-600">•</span>
+                <span className="text-slate-400">{aiProb}% confidence</span>
               </div>
-
-              {/* Compact AI Pick Info */}
-              <div className="pt-2 border-t border-slate-700">
-                <div className="flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-1.5 text-slate-500">
-                    <svg className="w-3 h-3 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                    </svg>
-                    <span>AI Predicted:</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <span className={matchesAI ? 'text-emerald-400 font-semibold' : 'text-amber-400 font-semibold'}>
-                      {aiPick}
-                    </span>
-                    <span className="text-slate-600">•</span>
-                    <span className="text-slate-400">{aiProb}% confidence</span>
-                  </div>
-                </div>
-              </div>
-
-              {isResolved && (
-                <div className="mt-2 pt-2 border-t border-slate-700">
-                  <span className="text-xs text-slate-500 italic">
-                    💡 Check the Predictions page to see final game results
-                  </span>
-                </div>
-              )}
             </div>
           );
         })}
@@ -349,17 +386,16 @@ export default function MyParlaysPage() {
               <button
                 key={status}
                 onClick={() => setFilter(status)}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium capitalize transition-colors ${
-                  filter === status
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
-                }`}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium capitalize transition-colors ${filter === status
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                  }`}
               >
                 {status}
               </button>
             ))}
           </div>
-          
+
           <Link
             href="/parlay-builder"
             className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-5 py-2 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity"
@@ -372,8 +408,8 @@ export default function MyParlaysPage() {
         {filteredParlays.length === 0 ? (
           <div className="bg-slate-800/30 border border-slate-700 rounded-lg p-8 text-center max-w-2xl mx-auto">
             <div className="text-slate-400 mb-3 text-sm">
-              {filter === 'all' 
-                ? "You haven't created any parlays yet" 
+              {filter === 'all'
+                ? "You haven't created any parlays yet"
                 : `No ${filter} parlays found`}
             </div>
             <Link
@@ -387,7 +423,7 @@ export default function MyParlaysPage() {
           <div className="flex flex-wrap gap-4 justify-start">
             {filteredParlays.map(parlay => {
               const isExpanded = expandedParlays.has(parlay.id);
-              
+
               return (
                 <div
                   key={parlay.id}
@@ -406,6 +442,45 @@ export default function MyParlaysPage() {
                         <span>•</span>
                         <span>{parlay.leg_count} Legs</span>
                       </div>
+                      {/* Legs Hit Progress */}
+                      {parlay.games && parlay.games.length > 0 && (() => {
+                        const totalLegs = parlay.games.length;
+                        const gamesWithResults = parlay.games.filter(g => g.gameData?.is_final);
+                        const legsWithResults = gamesWithResults.length;
+                        const legsHit = gamesWithResults.filter(g => g.gameData?.is_correct === true).length;
+
+                        if (legsWithResults > 0) {
+                          return (
+                            <div className="mt-2">
+                              <div className="flex items-center gap-2 mb-1">
+                                <div className="text-xs text-slate-400">
+                                  Legs: <span className={`font-bold ${parlay.is_hit === true ? 'text-green-400' :
+                                    parlay.is_hit === false ? 'text-red-400' :
+                                      'text-blue-400'
+                                    }`}>
+                                    {legsHit}/{totalLegs}
+                                  </span> hit
+                                </div>
+                                {legsWithResults < totalLegs && (
+                                  <span className="text-xs text-slate-500 italic">
+                                    ({totalLegs - legsWithResults} pending)
+                                  </span>
+                                )}
+                              </div>
+                              <div className="w-full bg-slate-700 rounded-full h-1.5">
+                                <div
+                                  className={`h-1.5 rounded-full transition-all ${parlay.is_hit === true ? 'bg-green-500' :
+                                    parlay.is_hit === false ? 'bg-red-500' :
+                                      'bg-blue-500'
+                                    }`}
+                                  style={{ width: `${(legsHit / totalLegs) * 100}%` }}
+                                ></div>
+                              </div>
+                            </div>
+                          );
+                        }
+                        return null;
+                      })()}
                     </div>
                     <div className="flex items-center gap-2">
                       <span className={getStatusBadge(parlay.status)}>
@@ -431,7 +506,7 @@ export default function MyParlaysPage() {
                     <div className="text-right">
                       <div className="text-slate-500 text-xs mb-0.5">Cost</div>
                       <div className="text-white font-semibold text-sm">
-                        {parlay.is_hit !== null 
+                        {parlay.is_hit !== null
                           ? `${parlay.legs_hit || 0}/${parlay.leg_count}`
                           : `${parlay.sms_bucks_cost || 0} SMS`}
                       </div>

@@ -355,23 +355,17 @@ class ParlayService {
   // GET USER'S PARLAYS
   // Returns all parlays for a specific user
   // ==========================================
-  async getUserParlays(userId, filters = {}) {
+  async getUserParlays(userId, options = {}) {
     try {
-      const { season, status } = filters;
-
-      let query = `
-        SELECT * FROM user_parlays
-        WHERE user_id = $1
-      `;
+      const { season, status } = options;
+      let query = `SELECT * FROM user_parlays WHERE user_id = $1`;
       const params = [userId];
 
-      // Add season filter if provided
       if (season) {
-        query += ` AND season = $${params.length + 1}`;
+        query += ` AND season = $2`;
         params.push(season);
       }
 
-      // Add status filter if provided
       if (status === 'won') {
         query += ` AND is_hit = true`;
       } else if (status === 'lost') {
@@ -384,7 +378,75 @@ class ParlayService {
 
       const result = await pool.query(query, params);
 
-      return result.rows;
+      // ENHANCEMENT: Enrich each parlay with actual game results
+      const enrichedParlays = await Promise.all(
+        result.rows.map(async (parlay) => {
+          if (!parlay.games || parlay.games.length === 0) {
+            return parlay;
+          }
+
+          // Fetch actual game results for each game in the parlay
+          const gamesWithResults = await Promise.all(
+            parlay.games.map(async (game) => {
+              console.log(`🔍 Looking for game_id: ${game.game_id}`);
+
+              const gameResult = await pool.query(
+                `SELECT home_team, away_team, home_score, away_score, is_final
+                 FROM games
+                 WHERE id = $1`,
+                [game.game_id]
+              );
+
+              console.log(`🔍 Query result for game ${game.game_id}:`, gameResult.rows.length, 'rows found');
+
+              if (gameResult.rows.length > 0) {
+                console.log(`🔍 Game data:`, gameResult.rows[0]);
+              }
+
+              if (gameResult.rows.length === 0) {
+                return { ...game, gameData: null };
+              }
+
+              const gameData = gameResult.rows[0];
+
+              // Determine actual winner
+              let actualWinner = null;
+              let isCorrect = null;
+
+              if (gameData.is_final) {
+                if (gameData.home_score > gameData.away_score) {
+                  actualWinner = gameData.home_team;
+                } else if (gameData.away_score > gameData.home_score) {
+                  actualWinner = gameData.away_team;
+                } else {
+                  actualWinner = 'TIE';
+                }
+
+                // Check if user's pick was correct
+                isCorrect = (game.picked_winner === actualWinner);
+              }
+
+              return {
+                ...game,
+                gameData: {
+                  home_score: gameData.home_score,
+                  away_score: gameData.away_score,
+                  is_final: gameData.is_final,
+                  actual_winner: actualWinner,
+                  is_correct: isCorrect
+                }
+              };
+            })
+          );
+
+          return {
+            ...parlay,
+            games: gamesWithResults
+          };
+        })
+      );
+
+      return enrichedParlays;
     } catch (error) {
       console.error('Get user parlays error:', error);
       throw error;
