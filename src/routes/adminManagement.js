@@ -449,7 +449,7 @@ router.get('/members/:userId', async (req, res) => {
 // ==========================================
 router.post('/members/:userId/adjust-bucks', async (req, res) => {
   const client = await pool.connect();
-  
+
   try {
     const { userId } = req.params;
     const { amount, reason } = req.body;
@@ -539,7 +539,7 @@ router.post('/members/:userId/adjust-bucks', async (req, res) => {
 // ==========================================
 router.post('/members/:userId/change-tier', async (req, res) => {
   const client = await pool.connect();
-  
+
   try {
     const { userId } = req.params;
     const { tier } = req.body;
@@ -690,7 +690,7 @@ router.post('/members/:userId/add-free-month', async (req, res) => {
 // ==========================================
 router.post('/members/:userId/cancel-membership', async (req, res) => {
   const client = await pool.connect();
-  
+
   try {
     const { userId } = req.params;
 
@@ -719,6 +719,189 @@ router.post('/members/:userId/cancel-membership', async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Failed to cancel membership'
+    });
+  } finally {
+    client.release();
+  }
+});
+
+// ==========================================
+// POST /api/admin/management/reset/parlays
+// DANGER: Reset all user parlays
+// ==========================================
+router.post('/reset/parlays', async (req, res) => {
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    // Delete all user parlays (games are stored in jsonb column, no separate legs table)
+    const parlayResult = await client.query('DELETE FROM user_parlays');
+
+    // Reset weekly parlay counts
+    await client.query('DELETE FROM weekly_parlay_counts');
+
+    await client.query('COMMIT');
+
+    res.json({
+      success: true,
+      message: `Successfully deleted ${parlayResult.rowCount} parlays`,
+      parlaysDeleted: parlayResult.rowCount
+    });
+
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Reset parlays error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to reset parlays'
+    });
+  } finally {
+    client.release();
+  }
+});
+
+// ==========================================
+// POST /api/admin/management/reset/transactions
+// DANGER: Reset all SMS Bucks transactions
+// ==========================================
+router.post('/reset/transactions', async (req, res) => {
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    // Get count before deleting
+    const countResult = await client.query('SELECT COUNT(*) FROM sms_bucks_transactions');
+    const count = parseInt(countResult.rows[0].count);
+
+    // Delete all SMS Bucks transactions
+    await client.query('DELETE FROM sms_bucks_transactions');
+
+    // Optional: Reset all user SMS Bucks to their tier default
+    await client.query(`
+      UPDATE users 
+      SET sms_bucks = CASE 
+        WHEN membership_tier = 'vip' THEN 1000
+        WHEN membership_tier = 'premium' THEN 500
+        ELSE 0
+      END
+    `);
+
+    await client.query('COMMIT');
+
+    res.json({
+      success: true,
+      message: `Successfully deleted ${count} transactions and reset balances`,
+      transactionsDeleted: count
+    });
+
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Reset transactions error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to reset transactions'
+    });
+  } finally {
+    client.release();
+  }
+});
+
+// ==========================================
+// POST /api/admin/management/reset/competition-stats
+// DANGER: Reset all competition-related stats
+// ==========================================
+router.post('/reset/competition-stats', async (req, res) => {
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    // Reset weekly competition data
+    await client.query('DELETE FROM weekly_competitions');
+
+    // Reset competition standings (not leaderboard)
+    await client.query('DELETE FROM weekly_competition_standings');
+
+    await client.query('COMMIT');
+
+    res.json({
+      success: true,
+      message: 'Successfully reset all competition stats'
+    });
+
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Reset competition stats error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to reset competition stats'
+    });
+  } finally {
+    client.release();
+  }
+});
+
+// ==========================================
+// POST /api/admin/management/reset/all
+// DANGER: FULL SYSTEM RESET - Use before going live
+// ==========================================
+router.post('/reset/all', async (req, res) => {
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    console.log('🚨 FULL SYSTEM RESET INITIATED...');
+
+    // 1. Delete user parlays (no separate legs table - games in jsonb)
+    const parlayResult = await client.query('DELETE FROM user_parlays');
+    console.log('✅ User parlays deleted:', parlayResult.rowCount);
+
+    // 2. Delete weekly parlay counts
+    await client.query('DELETE FROM weekly_parlay_counts');
+    console.log('✅ Weekly parlay counts deleted');
+
+    // 3. Delete SMS Bucks transactions
+    const txResult = await client.query('DELETE FROM sms_bucks_transactions');
+    console.log('✅ SMS Bucks transactions deleted:', txResult.rowCount);
+
+    // 4. Reset user SMS Bucks to tier defaults
+    await client.query(`
+      UPDATE users 
+      SET sms_bucks = CASE 
+        WHEN membership_tier = 'vip' THEN 1000
+        WHEN membership_tier = 'premium' THEN 500
+        ELSE 0
+      END
+    `);
+    console.log('✅ User SMS Bucks reset to defaults');
+
+    // 5. Delete competition data
+    await client.query('DELETE FROM weekly_competitions');
+    await client.query('DELETE FROM weekly_competition_standings');
+    console.log('✅ Competition data deleted');
+
+    await client.query('COMMIT');
+
+    console.log('🎉 FULL SYSTEM RESET COMPLETE');
+
+    res.json({
+      success: true,
+      message: 'Full system reset completed successfully',
+      details: {
+        parlaysDeleted: parlayResult.rowCount,
+        transactionsDeleted: txResult.rowCount
+      }
+    });
+
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Full system reset error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to complete system reset'
     });
   } finally {
     client.release();

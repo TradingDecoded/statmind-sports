@@ -17,6 +17,7 @@ export default function AdminPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [totalMembers, setTotalMembers] = useState(0);
   const [loadingMembers, setLoadingMembers] = useState(false);
+  const [resetMessage, setResetMessage] = useState('');
 
   // User detail modal state
   const [selectedMember, setSelectedMember] = useState(null);
@@ -324,6 +325,54 @@ export default function AdminPage() {
       setActionMessage('❌ Failed to cancel membership');
     } finally {
       setActionLoading(false);
+    }
+  };
+
+  // System reset handler
+  const handleSystemReset = async (resetType) => {
+    const confirmMessages = {
+      'parlays': 'Are you sure you want to DELETE ALL USER PARLAYS? This cannot be undone!',
+      'transactions': 'Are you sure you want to DELETE ALL SMS BUCKS TRANSACTIONS? This cannot be undone!',
+      'competition-stats': 'Are you sure you want to DELETE ALL COMPETITION DATA? This cannot be undone!',
+      'all': '⚠️ FULL SYSTEM RESET ⚠️\n\nThis will DELETE:\n- All parlays\n- All transactions\n- All competition data\n- Reset all balances\n\nThis cannot be undone! Are you absolutely sure?'
+    };
+
+    if (!confirm(confirmMessages[resetType])) {
+      return;
+    }
+
+    // Extra confirmation for full reset
+    if (resetType === 'all') {
+      const secondConfirm = prompt('Type "RESET" in ALL CAPS to confirm full system reset:');
+      if (secondConfirm !== 'RESET') {
+        setResetMessage('❌ Full reset cancelled - confirmation text did not match');
+        return;
+      }
+    }
+
+    setResetMessage('Processing reset...');
+    const token = localStorage.getItem('authToken');
+
+    try {
+      const response = await fetch(`/api/admin/management/reset/${resetType}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setResetMessage(`✅ ${data.message}`);
+        // Refresh members list
+        fetchMembers();
+      } else {
+        setResetMessage(`❌ ${data.error}`);
+      }
+    } catch (error) {
+      console.error('Reset error:', error);
+      setResetMessage('❌ Failed to complete reset operation');
     }
   };
 
@@ -637,8 +686,8 @@ export default function AdminPage() {
                 onClick={handleSaveWeights}
                 disabled={Math.abs(totalPercentage - 100) > 0.1}
                 className={`px-6 py-2 rounded-lg transition-colors font-medium ${Math.abs(totalPercentage - 100) < 0.1
-                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                    : 'bg-slate-700 text-slate-500 cursor-not-allowed'
+                  ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                  : 'bg-slate-700 text-slate-500 cursor-not-allowed'
                   }`}
               >
                 Save Changes
@@ -786,6 +835,84 @@ export default function AdminPage() {
                   </table>
                 </div>
               )}
+            </div>
+
+            {/* SYSTEM RESET SECTION - Add this after the members table */}
+            <div className="mt-8 border-t border-red-500/30 pt-8">
+              <div className="bg-red-900/20 border border-red-500/50 rounded-lg p-6">
+                <h2 className="text-2xl font-bold text-red-400 mb-4 flex items-center gap-2">
+                  ⚠️ System Reset Tools
+                </h2>
+                <p className="text-slate-300 mb-6">
+                  <strong>DANGER:</strong> These actions are irreversible. Use before going live to clear all test data.
+                </p>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Reset Parlays */}
+                  <div className="bg-slate-800 rounded-lg p-4 border border-slate-700">
+                    <h3 className="text-white font-semibold mb-2">Reset All Parlays</h3>
+                    <p className="text-slate-400 text-sm mb-4">
+                      Deletes all user parlays, legs, and weekly counts. User stats remain intact.
+                    </p>
+                    <button
+                      onClick={() => handleSystemReset('parlays')}
+                      className="w-full bg-orange-600 hover:bg-orange-700 text-white font-semibold py-2 px-4 rounded-lg transition"
+                    >
+                      Reset Parlays
+                    </button>
+                  </div>
+
+                  {/* Reset Transactions */}
+                  <div className="bg-slate-800 rounded-lg p-4 border border-slate-700">
+                    <h3 className="text-white font-semibold mb-2">Reset All Transactions</h3>
+                    <p className="text-slate-400 text-sm mb-4">
+                      Clears all SMS Bucks transaction history and resets balances to tier defaults.
+                    </p>
+                    <button
+                      onClick={() => handleSystemReset('transactions')}
+                      className="w-full bg-orange-600 hover:bg-orange-700 text-white font-semibold py-2 px-4 rounded-lg transition"
+                    >
+                      Reset Transactions
+                    </button>
+                  </div>
+
+                  {/* Reset Competition Stats */}
+                  <div className="bg-slate-800 rounded-lg p-4 border border-slate-700">
+                    <h3 className="text-white font-semibold mb-2">Reset Competition Stats</h3>
+                    <p className="text-slate-400 text-sm mb-4">
+                      Clears weekly competitions and leaderboard data.
+                    </p>
+                    <button
+                      onClick={() => handleSystemReset('competition-stats')}
+                      className="w-full bg-orange-600 hover:bg-orange-700 text-white font-semibold py-2 px-4 rounded-lg transition"
+                    >
+                      Reset Competition
+                    </button>
+                  </div>
+
+                  {/* FULL RESET */}
+                  <div className="bg-red-900/50 rounded-lg p-4 border border-red-500">
+                    <h3 className="text-red-400 font-bold mb-2">🚨 FULL SYSTEM RESET</h3>
+                    <p className="text-slate-300 text-sm mb-4">
+                      <strong>Resets everything:</strong> Parlays, transactions, competitions. Use before launch!
+                    </p>
+                    <button
+                      onClick={() => handleSystemReset('all')}
+                      className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg transition"
+                    >
+                      FULL RESET
+                    </button>
+                  </div>
+                </div>
+
+                {/* Reset Status Message */}
+                {resetMessage && (
+                  <div className={`mt-4 p-4 rounded-lg ${resetMessage.includes('✅') ? 'bg-green-900/30 border border-green-500' : 'bg-red-900/30 border border-red-500'
+                    }`}>
+                    <p className="text-white font-medium">{resetMessage}</p>
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Pagination */}
@@ -1031,27 +1158,26 @@ export default function AdminPage() {
             <h3 className="text-xl font-bold text-white mb-4">
               ⚠️ Confirm Weight Changes
             </h3>
-            
+
             <div className="bg-yellow-900 bg-opacity-30 border border-yellow-700 rounded-lg p-4 mb-4">
               <p className="text-yellow-300 text-sm">
-                <strong>Warning:</strong> These changes will affect all future predictions. 
+                <strong>Warning:</strong> These changes will affect all future predictions.
                 Make sure you understand the impact before proceeding.
               </p>
             </div>
 
             <div className="space-y-3 mb-6">
               <p className="text-slate-300 font-medium mb-2">Weight Changes:</p>
-              
+
               {Object.entries(pendingWeights).map(([key, newValue]) => {
                 const oldValue = originalWeights[key];
                 const hasChanged = Math.abs(newValue - oldValue) > 0.1;
-                const displayName = key === 'recentForm' ? 'Recent Form' 
+                const displayName = key === 'recentForm' ? 'Recent Form'
                   : key.charAt(0).toUpperCase() + key.slice(1);
-                
+
                 return (
-                  <div key={key} className={`flex justify-between items-center p-3 rounded ${
-                    hasChanged ? 'bg-slate-700' : 'bg-slate-800'
-                  }`}>
+                  <div key={key} className={`flex justify-between items-center p-3 rounded ${hasChanged ? 'bg-slate-700' : 'bg-slate-800'
+                    }`}>
                     <span className="text-slate-300">{displayName}</span>
                     <div className="flex items-center gap-3">
                       <span className={hasChanged ? 'text-slate-400 line-through' : 'text-slate-400'}>
