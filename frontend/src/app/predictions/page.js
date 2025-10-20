@@ -12,7 +12,7 @@ function getCurrentSeasonWeek() {
   const now = new Date();
   const year = now.getFullYear();
   const season = now.getMonth() >= 8 ? year : year - 1;
-  const seasonStart = new Date(season, 8, 1);
+  const seasonStart = new Date(season, 8, 4);
   const weeksDiff = Math.floor((now - seasonStart) / (7 * 24 * 60 * 60 * 1000));
   let week = Math.min(Math.max(weeksDiff + 1, 1), 18);
 

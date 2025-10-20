@@ -12,7 +12,7 @@ async function generatePredictions() {
     const year = now.getFullYear();
     const season = now.getMonth() >= 8 ? year : year - 1;
     
-    const seasonStart = new Date(season, 8, 1);
+    const seasonStart = new Date(season, 8, 4);
     const weeksDiff = Math.floor((now - seasonStart) / (7 * 24 * 60 * 60 * 1000));
     const currentWeek = Math.min(Math.max(weeksDiff + 1, 1), 18);
     const targetWeek = Math.min(currentWeek + 1, 18);
