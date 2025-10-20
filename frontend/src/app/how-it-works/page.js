@@ -32,9 +32,6 @@ export default function HowItWorksPage() {
       {/* Hero Section */}
       <section className="relative py-20 px-4 bg-gradient-to-b from-slate-900 to-slate-950">
         <div className="max-w-4xl mx-auto text-center">
-          <div className="inline-block px-4 py-2 bg-emerald-500/10 border border-emerald-500/20 rounded-full mb-6">
-            <span className="text-emerald-400 text-sm font-semibold">79.7% Accuracy in 2024</span>
-          </div>
           <h1 className="text-5xl md:text-6xl font-bold mb-6 bg-gradient-to-r from-white to-slate-300 bg-clip-text text-transparent">
             How StatMind Works
           </h1>

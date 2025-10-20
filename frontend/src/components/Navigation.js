@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import NotificationBell from './NotificationBell';
 import SMSBucksDisplay from './SMSBucksDisplay';
@@ -11,7 +11,26 @@ export default function Navigation() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isStatsMenuOpen, setIsStatsMenuOpen] = useState(false);
+  const statsMenuRef = useRef(null);
+  const userMenuRef = useRef(null);
   const { user, logout } = useAuth();
+
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event) {
+      // Close stats menu if clicking outside
+      if (statsMenuRef.current && !statsMenuRef.current.contains(event.target)) {
+        setIsStatsMenuOpen(false);
+      }
+      // Close user menu if clicking outside
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target)) {
+        setIsUserMenuOpen(false);
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Simplified main navigation links
   const mainLinks = [
@@ -66,7 +85,7 @@ export default function Navigation() {
             ))}
 
             {/* Stats Dropdown */}
-            <div className="relative">
+            <div className="relative" ref={statsMenuRef}>
               <button
                 onClick={() => setIsStatsMenuOpen(!isStatsMenuOpen)}
                 className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center space-x-1 ${statsLinks.some(link => pathname === link.href)
@@ -120,7 +139,7 @@ export default function Navigation() {
             {/* Auth Section */}
             {user ? (
               // User Menu
-              <div className="relative ml-3">
+              <div className="relative ml-3" ref={userMenuRef}>
                 <button
                   onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
                   className="flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-700 transition-all duration-200"
