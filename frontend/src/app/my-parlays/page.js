@@ -6,7 +6,6 @@ import Link from 'next/link';
 import { getTeamLogo, getTeamName } from '@/utils/teamLogos';
 import { useAutoRefresh } from '@/hooks/useAutoRefresh';
 import RefreshStatus from '@/components/RefreshStatus';
-import LiveBadge from '@/components/LiveBadge';
 
 export default function MyParlaysPage() {
   const router = useRouter();

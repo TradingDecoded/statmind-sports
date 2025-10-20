@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import PredictionCard from '@/components/PredictionCard';
 import { useAutoRefresh } from '@/hooks/useAutoRefresh';
 import RefreshStatus from '@/components/RefreshStatus';
-import LiveBadge from '@/components/LiveBadge';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://statmindsports.com/api';
 

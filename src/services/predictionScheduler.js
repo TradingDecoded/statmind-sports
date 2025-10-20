@@ -130,7 +130,7 @@ function getCurrentWeekInfo() {
   const year = now.getFullYear();
   const season = now.getMonth() >= 8 ? year : year - 1;
   
-  const seasonStart = new Date(season, 8, 1); // September 1st
+  const seasonStart = new Date(season, 8, 4); // September 1st
   const weeksDiff = Math.floor((now - seasonStart) / (7 * 24 * 60 * 60 * 1000));
   
   // Weeks 1-18: Regular season
