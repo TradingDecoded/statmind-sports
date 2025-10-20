@@ -27,6 +27,8 @@ function getCurrentSeasonWeek() {
 
 export default function PredictionsPage() {
   const { season: currentSeason, week: currentWeek } = getCurrentSeasonWeek();
+
+  const [season, setSeason] = useState(currentSeason);
   const [week, setWeek] = useState(currentWeek);
   const [predictions, setPredictions] = useState([]);
   const [loading, setLoading] = useState(true);
