@@ -821,14 +821,28 @@ router.post('/reset/competition-stats', async (req, res) => {
     // Reset weekly competition data
     await client.query('DELETE FROM weekly_competitions');
 
-    // Reset competition standings (not leaderboard)
+    // Reset competition standings
     await client.query('DELETE FROM weekly_competition_standings');
+
+    // Reset user stats (this is what was missing - it resets the leaderboard!)
+    await client.query(`
+      UPDATE user_stats 
+      SET 
+        total_parlays = 0,
+        total_wins = 0,
+        total_losses = 0,
+        pending_parlays = 0,
+        win_rate = 0.00,
+        current_streak = 0,
+        best_streak = 0,
+        leg_accuracy = 0.00
+    `);
 
     await client.query('COMMIT');
 
     res.json({
       success: true,
-      message: 'Successfully reset all competition stats'
+      message: 'Successfully reset all competition stats and leaderboard'
     });
 
   } catch (error) {
