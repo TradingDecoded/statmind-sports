@@ -80,121 +80,92 @@ router.post('/determine-winner', requireAuth, async (req, res) => {
   }
 });
 
-// Get user's current week competition status
-router.get('/status', optionalAuth, async (req, res) => {
+// ==========================================
+// GET /api/competition/status
+// Get user's competition status (used by parlay builder)
+// ==========================================
+router.get('/status', requireAuth, async (req, res) => {
   try {
     const userId = req.user.id;
 
-    // Get current year and week (using ISO week calculation)
-    const now = new Date();
-    const d = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
-    const dayNum = d.getUTCDay() || 7;
-    d.setUTCDate(d.getUTCDate() + 4 - dayNum);
-    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-    const currentWeek = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
-    const currentYear = d.getUTCFullYear();
+    // Get comprehensive status
+    const status = await competitionService.getUserCompetitionStatus(userId);
 
-    // Get user membership info
-    // If no user logged in, return free user status
-    if (!userId) {
-      return res.json({
-        success: true,
-        status: {
-          parlayCount: 0,
-          maxParlays: 10,
-          parlaysRemaining: 10,
-          minToQualify: 3,
-          isQualified: false,
-          canCreateMore: true,
-          isPremiumOrVIP: false,
-          membershipTier: 'free',
-          smsBucks: 0,
-          statusType: 'free_user',
-          message: 'Free tier - build parlays for fun!',
-          competition: null
-        }
-      });
-    }
-    const userQuery = await pool.query(
-      'SELECT membership_tier, sms_bucks FROM users WHERE id = $1',
-      [userId]
-    );
+    // Get user's parlay count for this week
+    const competition = await competitionService.getCurrentCompetition();
+    let parlayCount = 0;
 
-    if (userQuery.rows.length === 0) {
-      return res.status(404).json({ success: false, error: 'User not found' });
-    }
-
-    const user = userQuery.rows[0];
-    const isPremiumOrVIP = user.membership_tier === 'premium' || user.membership_tier === 'vip';
-
-    // Get weekly parlay count
-    const countQuery = await pool.query(
-      `SELECT parlay_count 
-       FROM weekly_parlay_counts 
-       WHERE user_id = $1 AND year = $2 AND week_number = $3`,
-      [userId, currentYear, currentWeek]
-    );
-
-    const parlayCount = countQuery.rows.length > 0 ? countQuery.rows[0].parlay_count : 0;
-
-    // Get current competition info
-    const competitionQuery = await pool.query(
-      `SELECT id, prize_amount, start_date, end_date 
-       FROM weekly_competitions 
-       WHERE year = $1 AND week_number = $2 AND status = 'active'`,
-      [currentYear, currentWeek]
-    );
-
-    const competition = competitionQuery.rows.length > 0 ? competitionQuery.rows[0] : null;
-
-    // Calculate status
-    let status = 'not_qualified';
-    let message = '';
-    let canCreateMore = true;
-    let parlaysRemaining = 10 - parlayCount;
-
-    if (!isPremiumOrVIP) {
-      status = 'free_user';
-      message = 'Free tier - build parlays for fun!';
-    } else if (parlayCount >= 10) {
-      status = 'max_reached';
-      message = 'Weekly maximum reached!';
-      canCreateMore = false;
-      parlaysRemaining = 0;
-    } else if (parlayCount >= 3) {
-      status = 'qualified';
-      message = `You're entered in the competition!`;
-    } else {
-      status = 'not_qualified';
-      message = `Create ${3 - parlayCount} more to qualify`;
+    if (competition) {
+      const parlayResult = await pool.query(
+        `SELECT COUNT(*) as count 
+         FROM user_parlays 
+         WHERE user_id = $1 
+         AND competition_id = $2
+         AND is_practice_parlay = FALSE`,
+        [userId, competition.id]
+      );
+      parlayCount = parseInt(parlayResult.rows[0].count);
     }
 
     res.json({
       success: true,
       status: {
+        ...status,
         parlayCount,
-        maxParlays: 10,
-        parlaysRemaining,
-        minToQualify: 3,
-        isQualified: parlayCount >= 3 && isPremiumOrVIP,
-        canCreateMore,
-        isPremiumOrVIP,
-        membershipTier: user.membership_tier,
-        smsBucks: user.sms_bucks,
-        statusType: status,
-        message,
-        competition: competition ? {
-          id: competition.id,
-          prizeAmount: competition.prize_amount,
-          startDate: competition.start_date,
-          endDate: competition.end_date
-        } : null
+        competitionId: competition ? competition.id : null
       }
     });
 
   } catch (error) {
     console.error('Error fetching competition status:', error);
-    res.status(500).json({ success: false, error: 'Server error' });
+    res.status(500).json({
+      success: false,
+      error: 'Server error'
+    });
+  }
+});
+
+// ==========================================
+// POST /api/competition/opt-in
+// User opts into weekly competition
+// ==========================================
+router.post('/opt-in', requireAuth, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const result = await competitionService.optInToCompetition(userId);
+    
+    if (!result.success) {
+      return res.status(400).json(result);
+    }
+
+    res.json(result);
+
+  } catch (error) {
+    console.error('Error opting in:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Server error' 
+    });
+  }
+});
+
+// ==========================================
+// POST /api/competition/opt-out
+// User opts out of weekly competition
+// ==========================================
+router.post('/opt-out', requireAuth, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const result = await competitionService.optOutOfCompetition(userId);
+    
+    res.json(result);
+
+  } catch (error) {
+    console.error('Error opting out:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Server error' 
+    });
   }
 });
 
