@@ -31,53 +31,58 @@ router.get("/week/:season/:week", async (req, res) => {
   try {
     const result = await pool.query(
       `
-      SELECT 
-        g.game_id AS "gameId",
-        g.week,
-        g.season,
-        g.game_date AS "date",
-        g.home_team AS "homeTeamKey",
-        g.away_team AS "awayTeamKey",
-        g.home_score AS "homeScore",
-        g.away_score AS "awayScore",
-        g.status,
-        g.is_final AS "isFinal",
-        ht.name AS "homeTeamName",
-        at.name AS "awayTeamName",
-        p.predicted_winner AS "predictedWinner",
-        p.confidence,
-        p.home_win_probability AS "homeWinProbability",
-        p.away_win_probability AS "awayWinProbability",
-        p.reasoning,
-        p.elo_score AS "eloScore",
-        p.power_score AS "powerScore",
-        p.situational_score AS "situationalScore",
-        p.matchup_score AS "matchupScore",
-        p.recent_form_score AS "recentFormScore",
-        pr.actual_winner AS "actualWinner",
-        pr.is_correct AS "isCorrect"
-      FROM predictions p
-      JOIN games g ON p.game_id = g.game_id
-      LEFT JOIN teams ht ON g.home_team = ht.key
-      LEFT JOIN teams at ON g.away_team = at.key
-      LEFT JOIN prediction_results pr ON g.game_id = pr.game_id
-      WHERE g.season = $1 AND g.week = $2
-      ORDER BY g.game_date ASC
-      `,
+  SELECT 
+    g.game_id AS "gameId",
+    g.week,
+    g.season,
+    g.game_date AS "date",
+    g.home_team AS "homeTeamKey",
+    g.away_team AS "awayTeamKey",
+    g.home_score AS "homeScore",
+    g.away_score AS "awayScore",
+    g.status,
+    g.is_final AS "isFinal",
+    ht.name AS "homeTeamName",
+    at.name AS "awayTeamName",
+    p.predicted_winner AS "predictedWinner",
+    p.confidence,
+    p.home_win_probability AS "homeWinProbability",
+    p.away_win_probability AS "awayWinProbability",
+    p.reasoning,
+    p.elo_score AS "eloScore",
+    p.power_score AS "powerScore",
+    p.situational_score AS "situationalScore",
+    p.matchup_score AS "matchupScore",
+    p.recent_form_score AS "recentFormScore",
+    pr.actual_winner AS "actualWinner",
+    pr.is_correct AS "isCorrect",
+    it.player_name AS "injuredPlayer",
+    it.position AS "injuredPosition",
+    it.team_abbreviation AS "injuredTeam",
+    it.injury_description AS "injuryDescription"
+  FROM predictions p
+  JOIN games g ON p.game_id = g.game_id
+  LEFT JOIN teams ht ON g.home_team = ht.key
+  LEFT JOIN teams at ON g.away_team = at.key
+  LEFT JOIN prediction_results pr ON g.game_id = pr.game_id
+  LEFT JOIN injury_tracking it ON g.id = it.game_id AND it.regenerated = TRUE
+  WHERE g.season = $1 AND g.week = $2
+  ORDER BY g.game_date ASC
+  `,
       [season, week]
     );
 
-    res.json({ 
-      success: true, 
+    res.json({
+      success: true,
       count: result.rows.length,
-      predictions: result.rows 
+      predictions: result.rows
     });
   } catch (error) {
     console.error("Error fetching week predictions:", error);
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       message: "Failed to fetch predictions",
-      error: error.message 
+      error: error.message
     });
   }
 });
@@ -121,17 +126,17 @@ router.get("/upcoming", async (req, res) => {
       [limit]
     );
 
-    res.json({ 
-      success: true, 
+    res.json({
+      success: true,
       count: result.rows.length,
-      predictions: result.rows 
+      predictions: result.rows
     });
   } catch (error) {
     console.error("Error fetching upcoming predictions:", error);
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       message: "Failed to fetch upcoming predictions",
-      error: error.message 
+      error: error.message
     });
   }
 });
@@ -178,22 +183,22 @@ router.get("/game/:gameId", async (req, res) => {
     );
 
     if (result.rows.length === 0) {
-      return res.status(404).json({ 
-        success: false, 
-        message: "Prediction not found" 
+      return res.status(404).json({
+        success: false,
+        message: "Prediction not found"
       });
     }
 
-    res.json({ 
-      success: true, 
-      prediction: result.rows[0] 
+    res.json({
+      success: true,
+      prediction: result.rows[0]
     });
   } catch (error) {
     console.error("Error fetching game prediction:", error);
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       message: "Failed to fetch prediction",
-      error: error.message 
+      error: error.message
     });
   }
 });
@@ -264,7 +269,7 @@ router.get("/accuracy/historical", async (req, res) => {
       `);
 
       // Get weekly breakdown for current season
-      const currentSeason = new Date().getMonth() >= 8 ? 
+      const currentSeason = new Date().getMonth() >= 8 ?
         new Date().getFullYear() : new Date().getFullYear() - 1;
       const weeklyResult = await pool.query(`
         SELECT 
@@ -320,10 +325,10 @@ router.get("/accuracy/historical", async (req, res) => {
     }
   } catch (error) {
     console.error("Error fetching historical accuracy:", error);
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       message: "Failed to fetch accuracy data",
-      error: error.message 
+      error: error.message
     });
   }
 });
@@ -431,8 +436,8 @@ router.get("/results", async (req, res) => {
     // Calculate accuracy percentages
     Object.keys(confidenceBreakdown).forEach(key => {
       const stats = confidenceBreakdown[key];
-      stats.accuracy = stats.total > 0 
-        ? ((stats.correct / stats.total) * 100).toFixed(1) 
+      stats.accuracy = stats.total > 0
+        ? ((stats.correct / stats.total) * 100).toFixed(1)
         : 0;
     });
 

@@ -23,8 +23,15 @@ export default function PredictionCard({ prediction }) {
     isFinal,
     actualWinner,
     isCorrect,
-    date
+    date,
+    injuredPlayer,
+    injuredPosition,
+    injuredTeam,
+    injuryDescription
   } = prediction;
+
+  // Check if this game has injury impact
+  const hasInjuryImpact = injuredPlayer && injuredTeam;
 
   const gameDate = new Date(date);
   const isHomeWinner = predictedWinner === homeTeamKey;
@@ -61,9 +68,29 @@ export default function PredictionCard({ prediction }) {
             ? 'bg-emerald-500/10 border-emerald-500/30'
             : 'bg-red-500/10 border-red-500/30'
             }`}>
-            <p className="text-slate-400 text-sm">
-              {formatGameDateTime(date, true)}
-            </p>
+            <div className="flex items-center gap-2">
+              <p className="text-slate-400 text-sm">
+                {formatGameDateTime(date, true)}
+              </p>
+              {hasInjuryImpact && (
+                <div
+                  className="group relative flex items-center"
+                  title={`Updated for ${injuredPlayer} (${injuredPosition}) injury`}
+                >
+                  <span className="text-red-400 text-lg">🏥</span>
+                  <div className="hidden group-hover:block absolute left-0 top-6 z-50 bg-slate-900 border border-slate-700 rounded-lg p-3 shadow-xl w-64">
+                    <p className="text-yellow-400 font-semibold text-xs mb-1">⚠️ INJURY IMPACT</p>
+                    <p className="text-white text-sm mb-1">
+                      <span className="font-bold">{injuredPlayer}</span> ({injuredPosition})
+                    </p>
+                    <p className="text-slate-400 text-xs mb-1">{injuredTeam} • {injuryDescription}</p>
+                    <p className="text-emerald-400 text-xs mt-2 border-t border-slate-700 pt-2">
+                      ✓ Prediction updated
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
             {isFinal ? (
               <div className={`px-3 py-1 rounded-full text-xs font-bold ${wasCorrect
                 ? 'bg-emerald-500/20 text-emerald-400'
@@ -157,9 +184,29 @@ export default function PredictionCard({ prediction }) {
       >
         {/* Date Header with Status */}
         <div className="bg-slate-900/50 px-4 py-2 border-b border-slate-700 flex items-center justify-between">
-          <p className="text-slate-400 text-sm">
-            {formatGameDateTime(date, true)}
-          </p>
+          <div className="flex items-center gap-2">
+            <p className="text-slate-400 text-sm">
+              {formatGameDateTime(date, true)}
+            </p>
+            {hasInjuryImpact && (
+              <div
+                className="group relative flex items-center"
+                title={`Updated for ${injuredPlayer} (${injuredPosition}) injury`}
+              >
+                <span className="text-red-400 text-lg">🏥</span>
+                <div className="hidden group-hover:block absolute left-0 top-6 z-50 bg-slate-900 border border-slate-700 rounded-lg p-3 shadow-xl w-64">
+                  <p className="text-yellow-400 font-semibold text-xs mb-1">⚠️ INJURY IMPACT</p>
+                  <p className="text-white text-sm mb-1">
+                    <span className="font-bold">{injuredPlayer}</span> ({injuredPosition})
+                  </p>
+                  <p className="text-slate-400 text-xs mb-1">{injuredTeam} • {injuryDescription}</p>
+                  <p className="text-emerald-400 text-xs mt-2 border-t border-slate-700 pt-2">
+                    ✓ Prediction updated
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
           {/* Status Badge */}
           {homeScore !== null && !isFinal ? (
             <LiveBadge isLive={true} />
