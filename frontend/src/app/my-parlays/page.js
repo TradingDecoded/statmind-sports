@@ -13,6 +13,8 @@ export default function MyParlaysPage() {
   const [userStats, setUserStats] = useState(null);
   const [expandedParlays, setExpandedParlays] = useState(new Set());
   const [error, setError] = useState(null);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [selectedParlay, setSelectedParlay] = useState(null);
 
   useEffect(() => {
     const token = localStorage.getItem('authToken');
@@ -73,13 +75,17 @@ export default function MyParlaysPage() {
     }
   };
 
-  const deleteParlay = async (parlayId) => {
-    if (!confirm('Are you sure you want to delete this parlay? This action cannot be undone.'))
-      return;
+  const handleDeleteClick = (parlay) => {
+    setSelectedParlay(parlay);
+    setShowDeleteDialog(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!selectedParlay) return;
 
     try {
       const token = localStorage.getItem('authToken');
-      const response = await fetch(`/api/parlay/${parlayId}`, {
+      const response = await fetch(`/api/parlay/${selectedParlay.id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -88,28 +94,33 @@ export default function MyParlaysPage() {
 
       const data = await response.json();
 
-      // Check if parlay is locked
       if (!response.ok) {
         if (data.locked) {
-          // Show specific message about parlay being locked
           alert(`🔒 Parlay Locked\n\n${data.message}`);
         } else {
           alert(`Failed to delete parlay: ${data.error || 'Unknown error'}`);
         }
+        setShowDeleteDialog(false);
+        setSelectedParlay(null);
         return;
       }
 
-      // Successfully deleted
-      setParlays(prevParlays => prevParlays.filter(p => p.id !== parlayId));
-      router.refresh();
-      await fetchMyParlays();
-      await fetchUserStats();
+      // Success - show refund info if applicable
+      if (data.refunded && data.refundAmount > 0) {
+        alert(`✅ Parlay deleted successfully!\n\n💰 ${data.refundAmount} SMS Bucks have been refunded to your account.`);
+      } else {
+        alert('✅ Parlay deleted successfully!');
+      }
 
-      alert('✅ Parlay deleted successfully');
-    } catch (err) {
-      console.error('Delete error:', err);
-      alert('Failed to delete parlay. Please try again.');
-      fetchMyParlays();
+      // Refresh the page
+      window.location.reload();
+
+    } catch (error) {
+      console.error('Delete error:', error);
+      alert('Error deleting parlay. Please try again.');
+    } finally {
+      setShowDeleteDialog(false);
+      setSelectedParlay(null);
     }
   };
 
@@ -581,10 +592,13 @@ export default function MyParlaysPage() {
                         </div>
                       ) : (
                         <button
-                          onClick={() => deleteParlay(parlay.id)}
-                          className="px-3 py-1.5 bg-red-600/20 hover:bg-red-600/30 text-red-400 rounded-lg text-xs font-medium transition-colors"
+                          onClick={() => handleDeleteClick(parlay)}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${parlay.sms_bucks_cost > 0
+                            ? 'bg-green-600/20 hover:bg-green-600/30 text-green-400'
+                            : 'bg-red-600/20 hover:bg-red-600/30 text-red-400'
+                            }`}
                         >
-                          Delete
+                          {parlay.sms_bucks_cost > 0 ? `💰 Delete & Refund ${parlay.sms_bucks_cost}` : 'Delete'}
                         </button>
                       )
                     )}
@@ -595,6 +609,63 @@ export default function MyParlaysPage() {
                 </div>
               );
             })}
+          </div>
+        )}
+        {/* Delete Confirmation Dialog */}
+        {showDeleteDialog && selectedParlay && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-slate-800 rounded-lg shadow-xl max-w-md w-full p-6 border border-slate-700">
+              <h3 className="text-xl font-bold mb-4 text-white">Delete Parlay?</h3>
+
+              <p className="text-slate-300 mb-4">
+                Are you sure you want to delete this {selectedParlay.leg_count}-leg parlay?
+              </p>
+
+              {/* Refund Status Display */}
+              {selectedParlay.sms_bucks_cost > 0 ? (
+                <div className="bg-green-900/30 border border-green-700 rounded-lg p-4 mb-4">
+                  <div className="flex items-center gap-2 text-green-400 font-semibold mb-2">
+                    ✅ Refund Eligible
+                  </div>
+                  <p className="text-green-300 text-sm">
+                    You will receive a full refund of <strong>{selectedParlay.sms_bucks_cost} SMS Bucks</strong> because no games have started yet.
+                  </p>
+                  <p className="text-green-400 text-xs mt-2">
+                    Your weekly parlay count will also be reduced.
+                  </p>
+                </div>
+              ) : (
+                <div className="bg-slate-700/50 border border-slate-600 rounded-lg p-4 mb-4">
+                  <div className="flex items-center gap-2 text-slate-300 font-semibold mb-2">
+                    ℹ️ No SMS Bucks Involved
+                  </div>
+                  <p className="text-slate-400 text-sm">
+                    This parlay did not cost SMS Bucks, so there is nothing to refund.
+                  </p>
+                </div>
+              )}
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setShowDeleteDialog(false);
+                    setSelectedParlay(null);
+                  }}
+                  className="flex-1 px-4 py-2 border border-slate-600 rounded-lg hover:bg-slate-700 transition text-white"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmDelete}
+                  className={`flex-1 px-4 py-2 rounded-lg text-white transition font-semibold ${selectedParlay.sms_bucks_cost > 0
+                      ? 'bg-green-600 hover:bg-green-700'
+                      : 'bg-red-600 hover:bg-red-700'
+                    }`}
+                >
+                  {selectedParlay.sms_bucks_cost > 0 ? 'Delete & Refund' : 'Delete'}
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>

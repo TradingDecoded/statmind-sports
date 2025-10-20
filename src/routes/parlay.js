@@ -210,24 +210,33 @@ router.get('/:id', requireAuth, async (req, res) => {
 
 // ==========================================
 // DELETE /api/parlay/:id
-// Delete a parlay permanently (only if games haven't started)
+// Delete a parlay with SMS Bucks refund if eligible
 // ==========================================
 router.delete('/:id', requireAuth, async (req, res) => {
+  const client = await pool.connect();
+
   try {
+    await client.query('BEGIN');
+
     const parlayId = req.params.id;
     const userId = req.user.id;
 
     console.log(`🗑️  Delete request for parlay ${parlayId} by user ${userId}`);
 
-    // Make sure parlay belongs to this user and get picks
-    const checkResult = await pool.query(
-      `SELECT user_id, is_hit, picks 
-       FROM user_parlays 
-       WHERE id = $1`,
+    // ==========================================
+    // Get parlay details including SMS Bucks cost and membership
+    // ==========================================
+    const checkResult = await client.query(
+      `SELECT up.user_id, up.is_hit, up.games, up.sms_bucks_cost, 
+          u.membership_tier, u.sms_bucks
+          FROM user_parlays up
+          JOIN users u ON up.user_id = u.id
+          WHERE up.id = $1`,
       [parlayId]
     );
 
     if (checkResult.rows.length === 0) {
+      await client.query('ROLLBACK');
       return res.status(404).json({
         success: false,
         error: 'Parlay not found'
@@ -235,6 +244,7 @@ router.delete('/:id', requireAuth, async (req, res) => {
     }
 
     if (checkResult.rows[0].user_id !== userId) {
+      await client.query('ROLLBACK');
       return res.status(403).json({
         success: false,
         error: 'Not authorized to delete this parlay'
@@ -242,17 +252,20 @@ router.delete('/:id', requireAuth, async (req, res) => {
     }
 
     const parlayStatus = checkResult.rows[0].is_hit;
-    const picks = checkResult.rows[0].picks;
+    const games = checkResult.rows[0].games;
+    const smsBucksCost = checkResult.rows[0].sms_bucks_cost || 0;
+    const membershipTier = checkResult.rows[0].membership_tier;
+    const currentBalance = checkResult.rows[0].sms_bucks;
 
     // ==========================================
     // PARLAY LOCKING: Check if any game has started
     // ==========================================
-    if (picks && picks.length > 0) {
-      // Get all game IDs from the parlay
-      const gameIds = picks.map(pick => pick.game_id);
+    let isLocked = false;
 
-      // Check if ANY game has already started (status is not 'scheduled')
-      const gameStatusCheck = await pool.query(
+    if (games && games.length > 0) {
+      const gameIds = games.map(game => game.game_id);
+
+      const gameStatusCheck = await client.query(
         `SELECT id, game_date, status,
                 CASE 
                   WHEN status IN ('in_progress', 'final') THEN true
@@ -265,14 +278,13 @@ router.delete('/:id', requireAuth, async (req, res) => {
         [gameIds]
       );
 
-      // Find if any game has started
       const anyGameStarted = gameStatusCheck.rows.some(game => game.has_started);
 
       if (anyGameStarted) {
-        // Get the first game that started for the error message
         const firstGameStarted = gameStatusCheck.rows.find(game => game.has_started);
+        await client.query('ROLLBACK');
 
-        console.log(`🔒 Cannot delete parlay ${parlayId} - games have started (status: ${firstGameStarted.status})`);
+        console.log(`🔒 Cannot delete parlay ${parlayId} - games have started`);
 
         return res.status(403).json({
           success: false,
@@ -286,16 +298,97 @@ router.delete('/:id', requireAuth, async (req, res) => {
     }
 
     // ==========================================
-    // Parlay is unlocked - proceed with deletion
+    // REFUND SMS BUCKS (if Premium/VIP and cost > 0)
     // ==========================================
+    let refundAmount = 0;
+    const isEligibleForRefund =
+      ['premium', 'vip'].includes(membershipTier) &&
+      smsBucksCost > 0 &&
+      !isLocked;
 
+    if (isEligibleForRefund) {
+      refundAmount = smsBucksCost;
+      const newBalance = currentBalance + refundAmount;
+
+      // Update user balance
+      await client.query(
+        'UPDATE users SET sms_bucks = $1 WHERE id = $2',
+        [newBalance, userId]
+      );
+
+      // Create refund transaction record
+      await client.query(
+        `INSERT INTO sms_bucks_transactions 
+         (user_id, amount, transaction_type, balance_after, description, related_parlay_id)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [
+          userId,
+          refundAmount,
+          'parlay_refund',
+          newBalance,
+          `Parlay deleted before games started - ${smsBucksCost} SMS Bucks refunded`,
+          parlayId
+        ]
+      );
+
+      console.log(`💰 Refunded ${refundAmount} SMS Bucks to user ${userId}`);
+    }
+
+    // ==========================================
+    // Decrement weekly parlay count (if Premium/VIP)
+    // ==========================================
+    if (['premium', 'vip'].includes(membershipTier)) {
+      const now = new Date();
+      const year = now.getFullYear();
+      const week = getWeekNumber(now);
+
+      await client.query(
+        `UPDATE weekly_parlay_counts
+         SET parlay_count = GREATEST(0, parlay_count - 1)
+         WHERE user_id = $1 AND year = $2 AND week_number = $3`,
+        [userId, year, week]
+      );
+
+      console.log(`📊 Decremented weekly parlay count for user ${userId}`);
+    }
+
+    // ==========================================
+    // Update competition standings (if Premium/VIP)
+    // ==========================================
+    if (['premium', 'vip'].includes(membershipTier)) {
+      // Get current competition ID
+      const competitionResult = await client.query(
+        `SELECT id FROM weekly_competitions 
+         WHERE status = 'active' 
+         AND start_date <= CURRENT_DATE 
+         AND end_date >= CURRENT_DATE
+         LIMIT 1`
+      );
+
+      if (competitionResult.rows.length > 0) {
+        const competitionId = competitionResult.rows[0].id;
+
+        await client.query(
+          `UPDATE weekly_competition_standings
+           SET parlays_entered = GREATEST(0, parlays_entered - 1)
+           WHERE user_id = $1 AND competition_id = $2`,
+          [userId, competitionId]
+        );
+
+        console.log(`🏆 Updated competition standings for user ${userId}`);
+      }
+    }
+
+    // ==========================================
     // Delete the parlay
-    await pool.query('DELETE FROM user_parlays WHERE id = $1', [parlayId]);
+    // ==========================================
+    await client.query('DELETE FROM user_parlays WHERE id = $1', [parlayId]);
 
+    // ==========================================
     // Update user stats based on parlay status
+    // ==========================================
     if (parlayStatus === null) {
-      // Was pending
-      await pool.query(
+      await client.query(
         `UPDATE user_stats 
          SET total_parlays = GREATEST(0, total_parlays - 1),
              pending_parlays = GREATEST(0, pending_parlays - 1)
@@ -303,8 +396,7 @@ router.delete('/:id', requireAuth, async (req, res) => {
         [userId]
       );
     } else if (parlayStatus === true) {
-      // Was a win
-      await pool.query(
+      await client.query(
         `UPDATE user_stats 
          SET total_parlays = GREATEST(0, total_parlays - 1),
              total_wins = GREATEST(0, total_wins - 1)
@@ -312,8 +404,7 @@ router.delete('/:id', requireAuth, async (req, res) => {
         [userId]
       );
     } else {
-      // Was a loss
-      await pool.query(
+      await client.query(
         `UPDATE user_stats 
          SET total_parlays = GREATEST(0, total_parlays - 1),
              total_losses = GREATEST(0, total_losses - 1)
@@ -323,7 +414,7 @@ router.delete('/:id', requireAuth, async (req, res) => {
     }
 
     // Recalculate win rate
-    await pool.query(
+    await client.query(
       `UPDATE user_stats 
        SET win_rate = CASE 
          WHEN (total_wins + total_losses) > 0 
@@ -334,20 +425,38 @@ router.delete('/:id', requireAuth, async (req, res) => {
       [userId]
     );
 
+    await client.query('COMMIT');
+
     console.log(`✅ Deleted parlay ${parlayId} for user ${userId}`);
 
     res.json({
       success: true,
-      message: 'Parlay deleted successfully'
+      message: 'Parlay deleted successfully',
+      refunded: isEligibleForRefund,
+      refundAmount: refundAmount
     });
 
   } catch (error) {
+    await client.query('ROLLBACK');
     console.error('❌ Delete parlay error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to delete parlay'
     });
+  } finally {
+    client.release();
   }
 });
+
+// ==========================================
+// HELPER FUNCTIONS
+// ==========================================
+function getWeekNumber(date) {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+}
 
 export default router;
