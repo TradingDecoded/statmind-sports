@@ -4,6 +4,9 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { getTeamLogo, getTeamName } from '@/utils/teamLogos';
+import { useAutoRefresh } from '@/hooks/useAutoRefresh';
+import RefreshStatus from '@/components/RefreshStatus';
+import LiveBadge from '@/components/LiveBadge';
 
 export default function MyParlaysPage() {
   const router = useRouter();
@@ -15,6 +18,32 @@ export default function MyParlaysPage() {
   const [error, setError] = useState(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [selectedParlay, setSelectedParlay] = useState(null);
+
+  // Auto-refresh functionality
+  const {
+    isRefreshing: isAutoRefreshing,
+    isPaused,
+    lastUpdated,
+    secondsSinceUpdate,
+    isGameWindow,
+    togglePause,
+    manualRefresh,
+  } = useAutoRefresh(
+    async () => {
+      await fetchMyParlays();
+    },
+    {
+      intervalMs: 60000,
+      enabledDays: [0, 1, 4],
+      enabledHours: {
+        0: [12, 23],
+        1: [18, 23],
+        4: [18, 23]
+      },
+      stopWhenAllFinal: false,
+      checkAllFinalFunction: null
+    }
+  );
 
   useEffect(() => {
     const token = localStorage.getItem('authToken');
@@ -393,6 +422,19 @@ export default function MyParlaysPage() {
             🎲 My Parlays
           </h1>
           <p className="text-slate-400 text-lg">Track your predictions and performance</p>
+        </div>
+
+        {/* Refresh Status Bar */}
+        <div className="mb-6 bg-slate-800/50 border border-slate-700 rounded-lg px-6 py-3">
+          <RefreshStatus
+            isRefreshing={isAutoRefreshing || loading}
+            isPaused={isPaused}
+            lastUpdated={lastUpdated}
+            secondsSinceUpdate={secondsSinceUpdate}
+            isGameWindow={isGameWindow}
+            onTogglePause={togglePause}
+            onManualRefresh={manualRefresh}
+          />
         </div>
 
         {/* Compact User Stats */}

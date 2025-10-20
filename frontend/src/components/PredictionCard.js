@@ -6,10 +6,11 @@ import { getTeamLogo, getTeamName } from '@/utils/teamLogos';
 import { formatGameDateTime } from '@/utils/dateTimeUtils';
 import ConfidenceBadge from './ConfidenceBadge';
 import GameDetailModal from './GameDetailModal';
+import LiveBadge from './LiveBadge';
 
 export default function PredictionCard({ prediction }) {
   const [showModal, setShowModal] = useState(false);
-  
+
   const {
     homeTeamKey,
     awayTeamKey,
@@ -24,63 +25,64 @@ export default function PredictionCard({ prediction }) {
     isCorrect,
     date
   } = prediction;
-  
+
   const gameDate = new Date(date);
   const isHomeWinner = predictedWinner === homeTeamKey;
-  
+
   // Determine if game is finished
   const gameFinished = isFinal && homeScore !== null && awayScore !== null;
   const actualHomeWinner = homeScore > awayScore;
-  
+
   // Convert probabilities
   let homeProb = parseFloat(homeWinProbability) || 0;
   let awayProb = parseFloat(awayWinProbability) || 0;
   if (homeProb < 1) homeProb = homeProb * 100;
   if (awayProb < 1) awayProb = awayProb * 100;
-  
+
   // Get the predicted team's probability
   const predictedProb = predictedWinner === homeTeamKey ? homeProb : awayProb;
-  
+
   // FINISHED GAME - Use ResultCard layout
   if (gameFinished) {
     const wasCorrect = isCorrect;
     const isHomeActualWinner = actualWinner === homeTeamKey;
-    
+
     return (
       <>
-        <div 
-          className={`bg-slate-800 rounded-xl border-2 overflow-hidden transition-all duration-300 hover:shadow-lg cursor-pointer ${
-            wasCorrect 
-              ? 'border-emerald-500/50 hover:border-emerald-500' 
-              : 'border-red-500/50 hover:border-red-500'
-          }`}
+        <div
+          className={`bg-slate-800 rounded-xl border-2 overflow-hidden transition-all duration-300 hover:shadow-lg cursor-pointer ${wasCorrect
+            ? 'border-emerald-500/50 hover:border-emerald-500'
+            : 'border-red-500/50 hover:border-red-500'
+            }`}
           onClick={() => setShowModal(true)}
         >
           {/* Header with Result Badge - ADDED TIME HERE */}
-          <div className={`px-4 py-2 border-b flex items-center justify-between ${
-            wasCorrect 
-              ? 'bg-emerald-500/10 border-emerald-500/30' 
-              : 'bg-red-500/10 border-red-500/30'
-          }`}>
+          <div className={`px-4 py-2 border-b flex items-center justify-between ${wasCorrect
+            ? 'bg-emerald-500/10 border-emerald-500/30'
+            : 'bg-red-500/10 border-red-500/30'
+            }`}>
             <p className="text-slate-400 text-sm">
               {formatGameDateTime(date, true)}
             </p>
-            <div className={`px-3 py-1 rounded-full text-xs font-bold ${
-              wasCorrect 
-                ? 'bg-emerald-500/20 text-emerald-400' 
+            {isFinal ? (
+              <div className={`px-3 py-1 rounded-full text-xs font-bold ${wasCorrect
+                ? 'bg-emerald-500/20 text-emerald-400'
                 : 'bg-red-500/20 text-red-400'
-            }`}>
-              {wasCorrect ? '✓ CORRECT' : '✗ INCORRECT'}
-            </div>
+                }`}>
+                {wasCorrect ? '✓ CORRECT' : '✗ INCORRECT'}
+              </div>
+            ) : (
+              <LiveBadge isLive={true} />
+            )}
           </div>
-          
+
           {/* Teams with Scores */}
           <div className="p-6">
             <div className="flex items-center justify-between mb-4">
               {/* Away Team */}
               <div className="flex items-center space-x-3">
-                <img 
-                  src={getTeamLogo(awayTeamKey)} 
+                <img
+                  src={getTeamLogo(awayTeamKey)}
                   alt={getTeamName(awayTeamKey)}
                   className="w-12 h-12 object-contain"
                 />
@@ -90,10 +92,10 @@ export default function PredictionCard({ prediction }) {
                   {!isHomeActualWinner && <span className="text-emerald-400 text-xs">WINNER</span>}
                 </div>
               </div>
-              
+
               {/* VS */}
               <div className="text-slate-500 font-bold">@</div>
-              
+
               {/* Home Team */}
               <div className="flex items-center space-x-3">
                 <div className="text-right">
@@ -101,14 +103,14 @@ export default function PredictionCard({ prediction }) {
                   <p className="text-2xl font-bold text-white">{homeScore}</p>
                   {isHomeActualWinner && <span className="text-emerald-400 text-xs">WINNER</span>}
                 </div>
-                <img 
-                  src={getTeamLogo(homeTeamKey)} 
+                <img
+                  src={getTeamLogo(homeTeamKey)}
                   alt={getTeamName(homeTeamKey)}
                   className="w-12 h-12 object-contain"
                 />
               </div>
             </div>
-            
+
             {/* Prediction Details */}
             <div className="space-y-3 pt-4 border-t border-slate-700">
               <div className="flex items-center justify-between text-sm">
@@ -117,12 +119,12 @@ export default function PredictionCard({ prediction }) {
                   {predictedWinner} ({predictedProb.toFixed(1)}%)
                 </span>
               </div>
-              
+
               <div className="flex items-center justify-center">
                 <ConfidenceBadge confidence={confidence} />
               </div>
             </div>
-            
+
             {/* Click Hint */}
             <div className="text-center pt-4 border-t border-slate-700 mt-4">
               <p className="text-slate-400 text-sm flex items-center justify-center">
@@ -137,7 +139,7 @@ export default function PredictionCard({ prediction }) {
         </div>
 
         {/* Modal */}
-        <GameDetailModal 
+        <GameDetailModal
           prediction={prediction}
           isOpen={showModal}
           onClose={() => setShowModal(false)}
@@ -145,28 +147,34 @@ export default function PredictionCard({ prediction }) {
       </>
     );
   }
-  
+
   // UPCOMING GAME - Original prediction layout
   return (
     <>
-      <div 
+      <div
         className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden hover:border-emerald-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-emerald-500/10 cursor-pointer"
         onClick={() => setShowModal(true)}
       >
-        {/* Date Header - ADDED TIME HERE */}
-        <div className="bg-slate-900/50 px-4 py-2 border-b border-slate-700">
+        {/* Date Header with Status */}
+        <div className="bg-slate-900/50 px-4 py-2 border-b border-slate-700 flex items-center justify-between">
           <p className="text-slate-400 text-sm">
             {formatGameDateTime(date, true)}
           </p>
+          {/* Status Badge */}
+          {homeScore !== null && !isFinal ? (
+            <LiveBadge isLive={true} />
+          ) : homeScore === null ? (
+            <span className="text-slate-500 text-xs px-2 py-1 bg-slate-800 rounded">UPCOMING</span>
+          ) : null}
         </div>
-        
+
         {/* Teams */}
         <div className="p-6">
           <div className="flex items-center justify-between mb-4">
             {/* Away Team */}
             <div className={`flex items-center space-x-3 transition-opacity ${!isHomeWinner ? '' : 'opacity-50'}`}>
-              <img 
-                src={getTeamLogo(awayTeamKey)} 
+              <img
+                src={getTeamLogo(awayTeamKey)}
                 alt={getTeamName(awayTeamKey)}
                 className="w-12 h-12 object-contain"
               />
@@ -175,38 +183,38 @@ export default function PredictionCard({ prediction }) {
                 <p className="text-slate-400 text-sm">{awayProb.toFixed(1)}%</p>
               </div>
             </div>
-            
+
             {/* VS */}
             <div className="text-slate-500 font-bold text-sm">@</div>
-            
+
             {/* Home Team */}
             <div className={`flex items-center space-x-3 transition-opacity ${isHomeWinner ? '' : 'opacity-50'}`}>
               <div className="text-right">
                 <p className="text-white font-semibold">{homeTeamKey}</p>
                 <p className="text-slate-400 text-sm">{homeProb.toFixed(1)}%</p>
               </div>
-              <img 
-                src={getTeamLogo(homeTeamKey)} 
+              <img
+                src={getTeamLogo(homeTeamKey)}
                 alt={getTeamName(homeTeamKey)}
                 className="w-12 h-12 object-contain"
               />
             </div>
           </div>
-          
+
           {/* Probability Bar - ORIGINAL COLORS PRESERVED */}
           <div className="mb-4">
             <div className="w-full bg-slate-700 rounded-full h-2 overflow-hidden flex">
-              <div 
+              <div
                 className="bg-gradient-to-r from-blue-500 to-blue-400 transition-all duration-1000"
                 style={{ width: `${awayProb}%` }}
               ></div>
-              <div 
+              <div
                 className="bg-gradient-to-r from-emerald-400 to-emerald-500 transition-all duration-1000"
                 style={{ width: `${homeProb}%` }}
               ></div>
             </div>
           </div>
-          
+
           {/* Winner Indicator */}
           <div className="flex items-center justify-center mb-4">
             <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-full px-4 py-2">
@@ -215,12 +223,12 @@ export default function PredictionCard({ prediction }) {
               </p>
             </div>
           </div>
-          
+
           {/* Confidence */}
           <div className="flex justify-center mb-4">
             <ConfidenceBadge confidence={confidence} />
           </div>
-          
+
           {/* Click Hint */}
           <div className="text-center pt-4 border-t border-slate-700">
             <p className="text-slate-400 text-sm flex items-center justify-center">
@@ -235,7 +243,7 @@ export default function PredictionCard({ prediction }) {
       </div>
 
       {/* Modal */}
-      <GameDetailModal 
+      <GameDetailModal
         prediction={prediction}
         isOpen={showModal}
         onClose={() => setShowModal(false)}

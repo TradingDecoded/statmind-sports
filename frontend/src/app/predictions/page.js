@@ -2,6 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import PredictionCard from '@/components/PredictionCard';
+import { useAutoRefresh } from '@/hooks/useAutoRefresh';
+import RefreshStatus from '@/components/RefreshStatus';
+import LiveBadge from '@/components/LiveBadge';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://statmindsports.com/api';
 
@@ -11,14 +14,19 @@ function getCurrentSeasonWeek() {
   const season = now.getMonth() >= 8 ? year : year - 1;
   const seasonStart = new Date(season, 8, 1);
   const weeksDiff = Math.floor((now - seasonStart) / (7 * 24 * 60 * 60 * 1000));
-  const week = Math.min(Math.max(weeksDiff + 1, 1), 18);
+  let week = Math.min(Math.max(weeksDiff + 1, 1), 18);
+
+  // If it's Monday or Tuesday, stay on previous week (wait for MNF to finish)
+  const dayOfWeek = now.getDay();
+  if (dayOfWeek === 1 || dayOfWeek === 2) {
+    week = Math.max(1, week - 1);
+  }
+
   return { season, week };
 }
 
 export default function PredictionsPage() {
   const { season: currentSeason, week: currentWeek } = getCurrentSeasonWeek();
-
-  const [season, setSeason] = useState(currentSeason);
   const [week, setWeek] = useState(currentWeek);
   const [predictions, setPredictions] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -26,6 +34,34 @@ export default function PredictionsPage() {
   const [confidenceFilter, setConfidenceFilter] = useState('ALL');
   const [sortBy, setSortBy] = useState('date');
   const [isInitialLoad, setIsInitialLoad] = useState(true);
+
+  // Auto-refresh functionality
+  const {
+    isRefreshing: isAutoRefreshing,
+    isPaused,
+    lastUpdated,
+    secondsSinceUpdate,
+    isGameWindow,
+    togglePause,
+    manualRefresh,
+  } = useAutoRefresh(
+    async () => {
+      await loadPredictions();
+    },
+    {
+      intervalMs: 60000,
+      enabledDays: [0, 1, 4],
+      enabledHours: {
+        0: [12, 23],
+        1: [18, 23],
+        4: [18, 23]
+      },
+      stopWhenAllFinal: true,
+      checkAllFinalFunction: async () => {
+        return predictions.length > 0 && predictions.every(pred => pred.isFinal);
+      }
+    }
+  );
 
   useEffect(() => {
     loadPredictions();
@@ -53,46 +89,39 @@ export default function PredictionsPage() {
         // Check if ALL games in this week are finished
         const allGamesFinished = predictions.every(pred => pred.isFinal && pred.homeScore !== null);
 
-        // If all games finished, try to auto-advance to next week
+        // If all games finished, try to load next week
         if (allGamesFinished) {
-          console.log(`📅 All games in Week ${week} are finished. Checking for next week...`);
+          console.log(`📅 All games in Week ${week} are finished. Checking next week...`);
 
-          // Try to load next week
-          const nextWeekResponse = await fetch(`${API_BASE_URL}/predictions/week/${season}/${week + 1}`);
-          const nextWeekData = await nextWeekResponse.json();
-          const nextWeekPredictions = nextWeekData.predictions || [];
+          const nextWeek = week + 1;
+          if (nextWeek <= 18) {
+            // Try to load next week
+            const nextResponse = await fetch(`${API_BASE_URL}/predictions/week/${season}/${nextWeek}`);
+            const nextData = await nextResponse.json();
 
-          if (nextWeekPredictions && nextWeekPredictions.length > 0) {
-            // Check if next week has any unfinished games
-            const hasUpcomingGames = nextWeekPredictions.some(pred => !pred.isFinal);
-
-            if (hasUpcomingGames) {
-              console.log(`✅ Auto-advancing to Week ${week + 1}`);
-              // Update to next week
-              setWeek(week + 1);
-              setPredictions(nextWeekPredictions);
+            if (nextData.success && nextData.predictions && nextData.predictions.length > 0) {
+              console.log(`✅ Loading Week ${nextWeek} predictions`);
+              setWeek(nextWeek);
+              setPredictions(nextData.predictions);
               setLoading(false);
               setIsInitialLoad(false);
               return;
             }
           }
-
-          // No next week or no upcoming games, stay on current week
-          console.log(`⚠️ No upcoming games in Week ${week + 1}, staying on Week ${week}`);
         }
-
-        setIsInitialLoad(false); // Mark initial load as complete
       }
 
+      // Show current week's predictions (default behavior)
       setPredictions(predictions);
+      setLoading(false);
+      setIsInitialLoad(false);
 
-    } catch (error) {
-      console.error('Error loading predictions:', error);
-      setError('Failed to load predictions');
-      setPredictions([]);
+    } catch (err) {
+      console.error('Error loading predictions:', err);
+      setError('Failed to load predictions. Please try again.');
+      setLoading(false);
+      setIsInitialLoad(false);
     }
-
-    setLoading(false);
   }
 
   const filteredPredictions = predictions.filter(pred => {
@@ -232,11 +261,31 @@ export default function PredictionsPage() {
           </div>
         )}
 
-        <div className="flex items-center justify-between mb-6">
-          <p className="text-slate-400">
-            Showing <span className="text-white font-semibold">{sortedPredictions.length}</span> prediction{sortedPredictions.length !== 1 ? 's' : ''}
-            {confidenceFilter !== 'ALL' && <span className="text-emerald-400"> · {confidenceFilter} confidence</span>}
+        {/* Showing count and Refresh Status - Same line with centered refresh */}
+        <div className="grid grid-cols-3 items-center mb-8">
+          {/* Left: Showing text */}
+          <p className="text-slate-400 text-left">
+            Showing <span className="font-bold text-white">{sortedPredictions.length}</span> prediction{sortedPredictions.length !== 1 ? 's' : ''}
+            {confidenceFilter !== 'ALL' && <span className="text-emerald-400"> • {confidenceFilter} confidence</span>}
           </p>
+
+          {/* Center: Refresh Status */}
+          <div className="flex justify-center">
+            <div className="bg-slate-800/50 border border-slate-700 rounded-lg px-4 py-2 inline-block">
+              <RefreshStatus
+                isRefreshing={isAutoRefreshing || loading}
+                isPaused={isPaused}
+                lastUpdated={lastUpdated}
+                secondsSinceUpdate={secondsSinceUpdate}
+                isGameWindow={isGameWindow}
+                onTogglePause={togglePause}
+                onManualRefresh={manualRefresh}
+              />
+            </div>
+          </div>
+
+          {/* Right: Empty (for balance) */}
+          <div></div>
         </div>
 
         {loading ? (
