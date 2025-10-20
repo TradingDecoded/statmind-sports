@@ -65,20 +65,6 @@ export default function Navigation() {
               </Link>
             ))}
 
-            {/* User Links (only if logged in) */}
-            {userLinks.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${pathname === link.href
-                  ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/50'
-                  : 'text-slate-300 hover:text-white hover:bg-slate-700'
-                  }`}
-              >
-                {link.label}
-              </Link>
-            ))}
-
             {/* Stats Dropdown */}
             <div className="relative">
               <button
@@ -110,6 +96,20 @@ export default function Navigation() {
                 </div>
               )}
             </div>
+
+            {/* User Links (only if logged in) */}
+            {userLinks.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${pathname === link.href
+                  ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/50'
+                  : 'text-slate-300 hover:text-white hover:bg-slate-700'
+                  }`}
+              >
+                {link.label}
+              </Link>
+            ))}
 
             {/* Notification Bell (only when logged in) */}
             {user && <NotificationBell />}
@@ -144,10 +144,10 @@ export default function Navigation() {
                       <p className="text-xs text-slate-400">{user.email}</p>
                       <div className="mt-2">
                         <span className={`inline-block px-2 py-1 rounded text-xs font-semibold uppercase ${user.membership_tier === 'vip'
-                            ? 'bg-amber-600 text-white'
-                            : user.membership_tier === 'premium'
-                              ? 'bg-blue-600 text-white'
-                              : 'bg-slate-600 text-slate-300'
+                          ? 'bg-amber-600 text-white'
+                          : user.membership_tier === 'premium'
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-slate-600 text-slate-300'
                           }`}>
                           {user.membership_tier === 'vip' && '👑 VIP'}
                           {user.membership_tier === 'premium' && '🏆 PREMIUM'}

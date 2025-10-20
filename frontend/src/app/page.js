@@ -57,11 +57,24 @@ export default function HomePage() {
 
       console.log('🎯 High confidence picks:', highConfidencePicks.length);
 
-      // Check if ALL high confidence games are completed
-      const allCompleted = highConfidencePicks.every(pred => pred.isFinal);
+      // Fetch ALL predictions for the current week (includes both upcoming and completed)
+      const weekResponse = await fetch(`${API_BASE_URL}/predictions/week/2025/${currentWeek}`);
+      const weekData = await weekResponse.json();
 
-      if (allCompleted && highConfidencePicks.length > 0) {
-        console.log('✅ All high confidence games completed, loading NEXT week...');
+      if (!data.success || !data.predictions) {
+        throw new Error('Failed to load predictions');
+      }
+
+      console.log('📊 Total predictions for this week:', data.predictions.length);
+
+      // Check if ALL games in the week are completed (not just high confidence)
+      const allGamesCompleted = data.predictions.length > 0 && data.predictions.every(pred => pred.isFinal);
+
+      console.log('🎮 All games completed?', allGamesCompleted);
+
+      // If ALL games in the current week are completed, load NEXT week
+      if (allGamesCompleted) {
+        console.log('✅ All Week', currentWeek, 'games completed, loading NEXT week...');
 
         // Load next week's predictions
         const nextWeek = currentWeek + 1;
@@ -70,6 +83,7 @@ export default function HomePage() {
           const nextWeekData = await nextWeekResponse.json();
 
           if (nextWeekData.success && nextWeekData.predictions) {
+            // Filter for HIGH confidence games from next week
             const nextWeekHighConfidence = nextWeekData.predictions.filter(pred =>
               pred.confidence && pred.confidence.toUpperCase() === 'HIGH'
             );

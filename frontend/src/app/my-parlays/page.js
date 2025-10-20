@@ -388,9 +388,11 @@ export default function MyParlaysPage() {
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 py-6">
       <div className="max-w-6xl mx-auto px-4">
         {/* Compact Header */}
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold text-white mb-1">My Parlays</h1>
-          <p className="text-slate-400 text-sm">Track your predictions and performance</p>
+        <div className="mb-8">
+          <h1 className="text-5xl font-bold mb-4 flex items-center gap-3">
+            🎲 My Parlays
+          </h1>
+          <p className="text-slate-400 text-lg">Track your predictions and performance</p>
         </div>
 
         {/* Compact User Stats */}
@@ -658,8 +660,8 @@ export default function MyParlaysPage() {
                 <button
                   onClick={confirmDelete}
                   className={`flex-1 px-4 py-2 rounded-lg text-white transition font-semibold ${selectedParlay.sms_bucks_cost > 0
-                      ? 'bg-green-600 hover:bg-green-700'
-                      : 'bg-red-600 hover:bg-red-700'
+                    ? 'bg-green-600 hover:bg-green-700'
+                    : 'bg-red-600 hover:bg-red-700'
                     }`}
                 >
                   {selectedParlay.sms_bucks_cost > 0 ? 'Delete & Refund' : 'Delete'}
