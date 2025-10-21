@@ -383,9 +383,25 @@ class CompetitionService {
 
     try {
       const now = new Date();
+
       // Calculate next Tuesday 2:00 AM ET as start time
+      // If today IS Tuesday and it's after 2 AM, we want NEXT week's Tuesday
+      // If today is NOT Tuesday, calculate days until next Tuesday
       const nextWeekStart = new Date(now);
-      const daysUntilTuesday = (2 - now.getDay() + 7) % 7 || 7;
+      const currentDay = now.getDay(); // 0 = Sunday, 1 = Monday, 2 = Tuesday, etc.
+
+      let daysUntilTuesday;
+      if (currentDay === 2) {
+        // Today IS Tuesday - always go to NEXT Tuesday (7 days)
+        daysUntilTuesday = 7;
+      } else if (currentDay < 2) {
+        // Before Tuesday this week
+        daysUntilTuesday = 2 - currentDay;
+      } else {
+        // After Tuesday this week
+        daysUntilTuesday = 7 - currentDay + 2;
+      }
+
       nextWeekStart.setDate(now.getDate() + daysUntilTuesday);
       nextWeekStart.setHours(2, 0, 0, 0); // 2:00 AM ET
 

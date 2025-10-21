@@ -4,6 +4,7 @@ import predictionEngine from "./predictionEngine.js";
 import espnDataService from './espnDataService.js';
 import { monitorInjuries } from '../scripts/injury-monitor.js';
 import { seasonTransition } from '../scripts/seasonTransition.js';
+import competitionService from './competitionService.js';
 
 console.log("📅 Full-Year Scheduler initialized...");
 
@@ -27,6 +28,33 @@ cron.schedule("0 6 1 3 *", async () => {
 // WEEKLY PREDICTION GENERATION
 // Handles regular season (weeks 1-18) AND playoffs (weeks 19-22)
 // ============================================
+
+// ============================================
+// WEEKLY COMPETITION MANAGEMENT
+// ============================================
+
+// TUESDAY 2:00 AM - Determine winner and create next week competition
+cron.schedule("0 2 * * 2", async () => {
+  console.log("🏆 TUESDAY 2 AM: Determining weekly winner...");
+  try {
+    const result = await competitionService.determineWeeklyWinner();
+
+    if (result.success) {
+      if (result.minimumMet) {
+        console.log(`✅ Winner determined: User ${result.winner.userId}`);
+        console.log(`   Prize: $${result.winner.prizeAmount}`);
+      } else {
+        console.log(`⚠️  Minimum not met. Rolled over to $${result.newPrize}`);
+      }
+
+      // Reset all users' opt-in status for new week
+      await competitionService.resetWeeklyOptIns();
+      console.log("✅ User opt-ins reset for new week");
+    }
+  } catch (error) {
+    console.error("❌ Error in weekly winner determination:", error);
+  }
+});
 
 // TUESDAY 8:00 AM - Generate upcoming week predictions
 cron.schedule("0 8 * * 2", async () => {
@@ -157,6 +185,7 @@ console.log("✅ Full-year scheduler ready!");
 console.log("📅 Automated tasks:");
 console.log("   - March 1st 6am: Elo regression (after Super Bowl)");
 console.log("   - Tuesday 8am: Generate upcoming week (regular season + playoffs)");
+console.log("   - Tuesday 2am: Determine winner & create next competition");
 console.log("   - Wednesday/Saturday 8pm: Injury checks");
 console.log("   - Hourly: Game score updates");
 console.log("   - Every 6 hours: Schedule refresh");

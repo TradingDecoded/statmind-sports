@@ -27,12 +27,15 @@ router.get('/available-games', requireAuth, async (req, res) => {
     // Determine season
     let calculatedSeason = currentMonth >= 8 ? currentYear : currentYear;
 
-    // NFL 2025 Season Start: September 4, 2025
-    // Calculate week based on days since season start
+    // NFL 2025 Season Start: September 4, 2025 (Thursday night game)
     const seasonStartDate = new Date(2025, 8, 4); // Sept 4, 2025 (month is 0-indexed)
     const daysSinceStart = Math.floor((now - seasonStartDate) / (1000 * 60 * 60 * 24));
-    const weeksSinceStart = Math.floor(daysSinceStart / 7);
-    let calculatedWeek = weeksSinceStart + 1; // Week 1 starts on day 0
+
+    // NFL weeks run Tuesday-Monday, calculate which week we're in
+    // Add 2 days because season starts on Thursday (adjust to Tuesday start)
+    const adjustedDays = daysSinceStart + 2;
+    const weeksSinceStart = Math.floor(adjustedDays / 7);
+    let calculatedWeek = weeksSinceStart + 1;
 
     // Ensure week is in valid range (1-18 for regular season)
     if (calculatedWeek < 1) calculatedWeek = 1;
