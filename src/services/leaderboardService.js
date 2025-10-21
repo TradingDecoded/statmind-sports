@@ -6,7 +6,7 @@
 import pool from '../config/database.js';
 
 class LeaderboardService {
-  
+
   // ==========================================
   // GET OVERALL LEADERBOARD
   // Top users by win rate (minimum 3 parlays)
@@ -14,7 +14,7 @@ class LeaderboardService {
   async getOverallLeaderboard(limit = 100, page = 1) {
     try {
       const offset = (page - 1) * limit;
-      
+
       // Get ranked users with minimum parlay requirement
       const result = await pool.query(
         `SELECT 
@@ -38,7 +38,7 @@ class LeaderboardService {
          LIMIT $1 OFFSET $2`,
         [limit, offset]
       );
-      
+
       // Get total count
       const countResult = await pool.query(
         `SELECT COUNT(*) as total
@@ -47,20 +47,20 @@ class LeaderboardService {
          WHERE s.total_parlays >= 3
            AND u.is_active = true`
       );
-      
+
       return {
         leaderboard: result.rows,
         total: parseInt(countResult.rows[0].total),
         page,
         limit
       };
-      
+
     } catch (error) {
       console.error('Error fetching overall leaderboard:', error);
       throw error;
     }
   }
-  
+
   // ==========================================
   // GET WEEKLY LEADERBOARD (OLD METHOD - KEPT FOR COMPATIBILITY)
   // Top users for parlays created this week
@@ -73,7 +73,7 @@ class LeaderboardService {
       const startOfWeek = new Date(now);
       startOfWeek.setDate(now.getDate() - dayOfWeek);
       startOfWeek.setHours(0, 0, 0, 0);
-      
+
       const result = await pool.query(
         `WITH weekly_stats AS (
           SELECT 
@@ -111,14 +111,14 @@ class LeaderboardService {
         LIMIT $2`,
         [startOfWeek, limit]
       );
-      
+
       return {
         leaderboard: result.rows,
         period_start: startOfWeek,
         period_end: now,
         total: result.rows.length
       };
-      
+
     } catch (error) {
       console.error('Error fetching weekly leaderboard:', error);
       throw error;
@@ -177,6 +177,7 @@ class LeaderboardService {
         competition: {
           id: competition.id,
           week_number: competition.week_number,
+          nfl_week: competition.nfl_week,
           year: competition.year,
           prize_amount: parseFloat(competition.prize_amount),
           is_rollover: competition.is_rollover,
@@ -186,13 +187,13 @@ class LeaderboardService {
         },
         total: result.rows.length
       };
-      
+
     } catch (error) {
       console.error('Error fetching competition leaderboard:', error);
       throw error;
     }
   }
-  
+
   // ==========================================
   // GET USER'S RANK
   // Find where the current user ranks
@@ -213,7 +214,7 @@ class LeaderboardService {
         SELECT rank FROM ranked_users WHERE id = $1`,
         [userId]
       );
-      
+
       // Competition rank
       const compResult = await pool.query(
         `SELECT wc.id 
@@ -234,7 +235,7 @@ class LeaderboardService {
         );
         competitionRank = compRankResult.rows[0]?.rank || null;
       }
-      
+
       // Get total user counts
       const totalOverall = await pool.query(
         `SELECT COUNT(*) as total
@@ -243,35 +244,35 @@ class LeaderboardService {
          WHERE s.total_parlays >= 3
            AND u.is_active = true`
       );
-      
-      const totalCompetition = compResult.rows.length > 0 
+
+      const totalCompetition = compResult.rows.length > 0
         ? await pool.query(
-            `SELECT COUNT(*) as total
+          `SELECT COUNT(*) as total
              FROM weekly_competition_standings
              WHERE competition_id = $1`,
-            [compResult.rows[0].id]
-          )
+          [compResult.rows[0].id]
+        )
         : { rows: [{ total: 0 }] };
-      
+
       return {
         overall_rank: overallResult.rows[0]?.rank || null,
         competition_rank: competitionRank,
         total_overall: parseInt(totalOverall.rows[0].total),
         total_competition: parseInt(totalCompetition.rows[0].total),
-        percentile_overall: overallResult.rows[0]?.rank 
+        percentile_overall: overallResult.rows[0]?.rank
           ? Math.round((1 - (overallResult.rows[0].rank / parseInt(totalOverall.rows[0].total))) * 100)
           : null,
         percentile_competition: competitionRank && parseInt(totalCompetition.rows[0].total) > 0
           ? Math.round((1 - (competitionRank / parseInt(totalCompetition.rows[0].total))) * 100)
           : null
       };
-      
+
     } catch (error) {
       console.error('Error fetching user rank:', error);
       throw error;
     }
   }
-  
+
   // ==========================================
   // GET LEADERBOARD STATS
   // Overall platform statistics
@@ -289,9 +290,9 @@ class LeaderboardService {
          INNER JOIN user_stats s ON u.id = s.user_id
          WHERE u.is_active = true`
       );
-      
+
       return result.rows[0];
-      
+
     } catch (error) {
       console.error('Error fetching leaderboard stats:', error);
       throw error;

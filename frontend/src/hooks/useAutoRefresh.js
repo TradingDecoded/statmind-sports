@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 
 /**
- * Custom hook for auto-refreshing data during NFL game windows
+ * Custom hook for auto-refreshing data ONLY when there are live games
  * @param {Function} refreshFunction - Function to call for refresh
  * @param {Object} options - Configuration options
  * @returns {Object} - Control functions and state
@@ -11,50 +11,50 @@ import { useEffect, useRef, useState } from 'react';
 export function useAutoRefresh(refreshFunction, options = {}) {
   const {
     intervalMs = 60000, // Default 60 seconds
-    enabledDays = [0, 1, 4], // Sunday=0, Monday=1, Thursday=4
-    enabledHours = { 0: [12, 23], 1: [18, 23], 4: [18, 23] }, // Game windows
     stopWhenAllFinal = true,
-    checkAllFinalFunction = null
+    checkAllFinalFunction = null,
+    predictions = [] // Pass predictions array to check for live games
   } = options;
 
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(null);
   const [secondsSinceUpdate, setSecondsSinceUpdate] = useState(0);
+  const [isGameWindow, setIsGameWindow] = useState(false);
   const intervalRef = useRef(null);
   const tickIntervalRef = useRef(null);
   const isVisibleRef = useRef(true);
 
-  // Check if we're in a game window OR if there are live games
-  const isGameWindow = async () => {
-    // First priority: Check if there are any live/non-final games
-    if (checkAllFinalFunction) {
-      try {
-        const allFinal = await checkAllFinalFunction();
-        if (!allFinal) {
-          // There are live games - always refresh
-          return true;
-        }
-      } catch (error) {
-        console.error('Error checking for live games:', error);
-      }
-    }
-
-    // Second priority: Check scheduled game windows
-    const now = new Date();
-    const day = now.getDay();
-    const hour = now.getHours();
-
-    if (!enabledDays.includes(day)) {
+  // Check if there are any LIVE games (has scores but not final)
+  const checkForLiveGames = () => {
+    if (!predictions || predictions.length === 0) {
       return false;
     }
 
-    const [startHour, endHour] = enabledHours[day] || [0, 0];
-    const adjustedHour = hour < 6 ? hour + 24 : hour;
-    const isInTimeWindow = adjustedHour >= startHour && adjustedHour <= endHour;
+    // A game is LIVE if it has scores BUT is not final
+    const hasLiveGames = predictions.some(pred => 
+      pred.homeScore !== null && 
+      pred.awayScore !== null && 
+      !pred.isFinal
+    );
 
-    return isInTimeWindow;
+    console.log(`🎮 Live Games Check: ${hasLiveGames ? 'YES' : 'NO'} (${predictions.length} predictions checked)`);
+    return hasLiveGames;
   };
+
+  // Update isGameWindow whenever predictions change
+  useEffect(() => {
+    const hasLive = checkForLiveGames();
+    setIsGameWindow(hasLive);
+    
+    if (hasLive && !intervalRef.current && !isPaused) {
+      console.log('🟢 Live games detected - starting auto-refresh');
+      startAutoRefresh();
+    } else if (!hasLive && intervalRef.current) {
+      console.log('🔴 No live games - stopping auto-refresh');
+      stopAutoRefresh();
+    }
+  }, [predictions]);
 
   // Handle visibility change (stop when tab is hidden)
   useEffect(() => {
@@ -66,7 +66,7 @@ export function useAutoRefresh(refreshFunction, options = {}) {
       } else {
         console.log('🔄 Page visible - resuming auto-refresh');
         // Refresh immediately when coming back
-        if (!isPaused && isGameWindow()) {
+        if (!isPaused && checkForLiveGames()) {
           performRefresh();
         }
       }
@@ -76,7 +76,7 @@ export function useAutoRefresh(refreshFunction, options = {}) {
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [isPaused]);
+  }, [isPaused, predictions]);
 
   // Perform the refresh
   const performRefresh = async () => {
@@ -85,13 +85,24 @@ export function useAutoRefresh(refreshFunction, options = {}) {
       return;
     }
 
+    // Check if there are live games
+    if (!checkForLiveGames()) {
+      console.log('⏸️ No live games - stopping auto-refresh');
+      stopAutoRefresh();
+      return;
+    }
+
     // Check if all games are final (if applicable)
     if (stopWhenAllFinal && checkAllFinalFunction) {
-      const allFinal = await checkAllFinalFunction();
-      if (allFinal) {
-        console.log('✅ All games final - stopping auto-refresh');
-        stopAutoRefresh();
-        return;
+      try {
+        const allFinal = await checkAllFinalFunction();
+        if (allFinal) {
+          console.log('✅ All games final - stopping auto-refresh');
+          stopAutoRefresh();
+          return;
+        }
+      } catch (error) {
+        console.error('Error checking if all final:', error);
       }
     }
 
@@ -110,17 +121,17 @@ export function useAutoRefresh(refreshFunction, options = {}) {
   };
 
   // Start auto-refresh
-  const startAutoRefresh = async () => {
+  const startAutoRefresh = () => {
     if (intervalRef.current) {
       return; // Already running
     }
 
-    if (!await isGameWindow()) {
-      console.log('⏸️ Not in game window - auto-refresh not started');
+    if (!checkForLiveGames()) {
+      console.log('⏸️ No live games - auto-refresh not started');
       return;
     }
 
-    console.log(`🔴 Starting auto-refresh (${intervalMs / 1000}s intervals)`);
+    console.log(`🔴 Starting auto-refresh (${intervalMs / 1000}s intervals) - LIVE GAMES DETECTED`);
 
     // Perform initial refresh
     performRefresh();
@@ -147,6 +158,7 @@ export function useAutoRefresh(refreshFunction, options = {}) {
       clearInterval(tickIntervalRef.current);
       tickIntervalRef.current = null;
     }
+    setIsGameWindow(false);
   };
 
   // Toggle pause
@@ -161,7 +173,10 @@ export function useAutoRefresh(refreshFunction, options = {}) {
 
   // Initialize on mount
   useEffect(() => {
-    startAutoRefresh();
+    const hasLive = checkForLiveGames();
+    if (hasLive) {
+      startAutoRefresh();
+    }
 
     // Cleanup on unmount
     return () => {
@@ -171,7 +186,7 @@ export function useAutoRefresh(refreshFunction, options = {}) {
 
   // Resume when unpause
   useEffect(() => {
-    if (!isPaused && isGameWindow()) {
+    if (!isPaused && checkForLiveGames()) {
       startAutoRefresh();
     } else if (isPaused) {
       stopAutoRefresh();
@@ -183,7 +198,7 @@ export function useAutoRefresh(refreshFunction, options = {}) {
     isPaused,
     lastUpdated,
     secondsSinceUpdate,
-    isGameWindow: isGameWindow(),
+    isGameWindow,
     togglePause,
     manualRefresh,
     stopAutoRefresh

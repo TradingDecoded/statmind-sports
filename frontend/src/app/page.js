@@ -34,13 +34,8 @@ export default function HomePage() {
     },
     {
       intervalMs: 60000,
-      enabledDays: [0, 1, 4],
-      enabledHours: {
-        0: [12, 23],
-        1: [18, 23],
-        4: [18, 23]
-      },
       stopWhenAllFinal: true,
+      predictions: predictions, // Pass predictions to check for live games
       checkAllFinalFunction: async () => {
         return predictions.length > 0 && predictions.every(pred => pred.isFinal);
       }

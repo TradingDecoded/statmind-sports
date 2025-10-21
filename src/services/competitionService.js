@@ -445,11 +445,35 @@ class CompetitionService {
   // HELPER: Calculate NFL week from date
   // ==========================================
   calculateNFLWeek(date) {
-    // NFL 2024 season starts September 5, 2024 (Week 1)
-    const seasonStart = new Date('2024-09-05');
+    // Determine which NFL season we're in
+    const year = date.getFullYear();
+    const month = date.getMonth(); // 0-11
+
+    // NFL season runs September through February
+    // If we're in Jan-July, we're in the previous year's season
+    // If we're in Aug-Dec, we're in the current year's season
+    let seasonYear;
+    if (month >= 0 && month <= 7) {
+      // Jan-Aug: Use previous year's season
+      seasonYear = year - 1;
+    } else {
+      // Sep-Dec: Use current year's season
+      seasonYear = year;
+    }
+
+    // NFL 2025 season starts September 4, 2025 (Week 1)
+    const seasonStart = new Date(`${seasonYear}-09-04`);
+
     const diffTime = Math.abs(date - seasonStart);
     const diffWeeks = Math.ceil(diffTime / (1000 * 60 * 60 * 24 * 7));
-    return Math.min(Math.max(diffWeeks, 1), 18); // Weeks 1-18
+    const nflWeek = Math.min(Math.max(diffWeeks, 1), 18);
+
+    console.log(`📅 Calculating NFL Week for ${date.toISOString()}`);
+    console.log(`   Season Year: ${seasonYear}`);
+    console.log(`   Season Start: ${seasonStart.toISOString()}`);
+    console.log(`   NFL Week: ${nflWeek}`);
+
+    return nflWeek;
   }
 
   // ==========================================

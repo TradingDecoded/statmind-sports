@@ -164,7 +164,7 @@ export default function LeaderboardPage() {
             <div className="flex items-center justify-between">
               <div>
                 <div className="text-2xl font-bold text-white mb-2">
-                  🏆 Week {competitionInfo.week_number} Competition
+                  🏆 NFL Week {competitionInfo.nfl_week || competitionInfo.week_number} Competition
                 </div>
                 <div className="text-amber-100">
                   Prize Pool: <span className="text-3xl font-bold text-white">${competitionInfo.prize_amount.toFixed(2)}</span>

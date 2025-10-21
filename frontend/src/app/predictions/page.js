@@ -7,19 +7,18 @@ import RefreshStatus from '@/components/RefreshStatus';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://statmindsports.com/api';
 
+// Updated function to match Home page logic
 function getCurrentSeasonWeek() {
   const now = new Date();
+  const seasonStartDate = new Date(2025, 8, 4); // Sept 4, 2025
+  const daysSinceStart = Math.floor((now - seasonStartDate) / (1000 * 60 * 60 * 24));
+  let week = Math.floor(daysSinceStart / 7) + 1;
+
+  if (week < 1) week = 1;
+  if (week > 18) week = 18;
+
   const year = now.getFullYear();
   const season = now.getMonth() >= 8 ? year : year - 1;
-  const seasonStart = new Date(season, 8, 4);
-  const weeksDiff = Math.floor((now - seasonStart) / (7 * 24 * 60 * 60 * 1000));
-  let week = Math.min(Math.max(weeksDiff + 1, 1), 18);
-
-  // If it's Monday or Tuesday, stay on previous week (wait for MNF to finish)
-  const dayOfWeek = now.getDay();
-  if (dayOfWeek === 1 || dayOfWeek === 2) {
-    week = Math.max(1, week - 1);
-  }
 
   return { season, week };
 }
@@ -51,13 +50,8 @@ export default function PredictionsPage() {
     },
     {
       intervalMs: 60000,
-      enabledDays: [0, 1, 4],
-      enabledHours: {
-        0: [12, 23],
-        1: [18, 23],
-        4: [18, 23]
-      },
       stopWhenAllFinal: true,
+      predictions: predictions, // Pass predictions to check for live games
       checkAllFinalFunction: async () => {
         return predictions.length > 0 && predictions.every(pred => pred.isFinal);
       }
@@ -210,18 +204,20 @@ export default function PredictionsPage() {
                       : i + 1 === 19 ? 'Wild Card Round'
                         : i + 1 === 20 ? 'Divisional Round'
                           : i + 1 === 21 ? 'Conference Championships'
-                            : i + 1 === 22 ? 'Super Bowl'
-                              : `Week ${i + 1}`
-                    }
+                            : 'Super Bowl'}
                   </option>
                 ))}
               </select>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">Confidence Level</label>
-              <select value={confidenceFilter} onChange={(e) => setConfidenceFilter(e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all cursor-pointer">
-                <option value="ALL">All Predictions</option>
+              <label className="block text-sm font-medium text-slate-300 mb-2">Confidence</label>
+              <select
+                value={confidenceFilter}
+                onChange={(e) => setConfidenceFilter(e.target.value)}
+                className="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all cursor-pointer"
+              >
+                <option value="ALL">All Confidence Levels</option>
                 <option value="HIGH">High Confidence</option>
                 <option value="MEDIUM">Medium Confidence</option>
                 <option value="LOW">Low Confidence</option>
@@ -230,7 +226,11 @@ export default function PredictionsPage() {
 
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-2">Sort By</label>
-              <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all cursor-pointer">
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                className="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all cursor-pointer"
+              >
                 <option value="date">Game Date</option>
                 <option value="confidence">Confidence Level</option>
                 <option value="probability">Win Probability</option>
@@ -239,22 +239,34 @@ export default function PredictionsPage() {
           </div>
         </div>
 
-        {!loading && filteredPredictions.length > 0 && (
-          <div className="bg-gradient-to-r from-emerald-900/20 to-teal-900/20 border border-emerald-500/30 rounded-xl p-6 mb-8">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-center">
-              <div>
+        {/* Refresh Status */}
+        <div className="mb-6 flex justify-center">
+          <div className="bg-slate-800/50 border border-slate-700 rounded-lg px-6 py-3">
+            <RefreshStatus
+              isRefreshing={isAutoRefreshing || loading}
+              isPaused={isPaused}
+              lastUpdated={lastUpdated}
+              secondsSinceUpdate={secondsSinceUpdate}
+              isGameWindow={isGameWindow}
+              onTogglePause={togglePause}
+              onManualRefresh={manualRefresh}
+            />
+          </div>
+        </div>
+
+        {/* Stats Summary - Single Green Bar */}
+        {filteredPredictions.length > 0 && (
+          <div className="bg-gradient-to-r from-emerald-900/30 to-teal-900/30 border border-emerald-500/30 rounded-xl px-8 py-6 mb-8">
+            <div className="flex items-center justify-around">
+              <div className="text-center">
                 <p className="text-slate-400 text-sm mb-1">Total Games</p>
                 <p className="text-white text-2xl font-bold">{filteredPredictions.length}</p>
               </div>
-              <div>
-                <p className="text-slate-400 text-sm mb-1">
-                  {confidenceFilter === 'ALL' ? 'High Confidence' : confidenceFilter.charAt(0) + confidenceFilter.slice(1).toLowerCase() + ' Confidence'}
-                </p>
-                <p className="text-emerald-400 text-2xl font-bold">
-                  {confidenceFilter === 'ALL' ? highConfidenceCount : filteredPredictions.length}
-                </p>
+              <div className="text-center">
+                <p className="text-slate-400 text-sm mb-1">{confidenceFilter === 'ALL' ? 'High Confidence' : confidenceFilter.charAt(0) + confidenceFilter.slice(1).toLowerCase() + ' Confidence'}</p>
+                <p className="text-emerald-400 text-2xl font-bold">{confidenceFilter === 'ALL' ? highConfidenceCount : filteredPredictions.length}</p>
               </div>
-              <div>
+              <div className="text-center">
                 <p className="text-slate-400 text-sm mb-1">Avg Win Probability</p>
                 <p className="text-white text-2xl font-bold">{avgProbability}%</p>
               </div>
@@ -262,51 +274,36 @@ export default function PredictionsPage() {
           </div>
         )}
 
-        {/* Showing count and Refresh Status - Same line with centered refresh */}
-        <div className="grid grid-cols-3 items-center mb-8">
-          {/* Left: Showing text */}
-          <p className="text-slate-400 text-left">
-            Showing <span className="font-bold text-white">{sortedPredictions.length}</span> prediction{sortedPredictions.length !== 1 ? 's' : ''}
-            {confidenceFilter !== 'ALL' && <span className="text-emerald-400"> • {confidenceFilter} confidence</span>}
-          </p>
-
-          {/* Center: Refresh Status */}
-          <div className="flex justify-center">
-            <div className="bg-slate-800/50 border border-slate-700 rounded-lg px-6 py-3">
-              <RefreshStatus
-                isRefreshing={isAutoRefreshing || loading}
-                isPaused={isPaused}
-                lastUpdated={lastUpdated}
-                secondsSinceUpdate={secondsSinceUpdate}
-                isGameWindow={isGameWindow}
-                onTogglePause={togglePause}
-                onManualRefresh={manualRefresh}
-              />
-            </div>
-          </div>
-
-          {/* Right: Empty (for balance) */}
-          <div></div>
-        </div>
-
+        {/* Predictions Grid */}
         {loading ? (
-          <div className="text-center py-20">
-            <div className="inline-block w-16 h-16 border-4 border-slate-600 border-t-emerald-500 rounded-full animate-spin"></div>
+          <div className="text-center py-16">
+            <div className="inline-block animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-emerald-500"></div>
             <p className="text-slate-400 mt-4">Loading predictions...</p>
           </div>
-        ) : sortedPredictions.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {sortedPredictions.map((prediction, idx) => (
-              <PredictionCard key={prediction.gameId || idx} prediction={prediction} />
-            ))}
+        ) : error ? (
+          <div className="bg-red-900/20 border border-red-500/50 rounded-xl p-8 text-center">
+            <svg className="w-12 h-12 text-red-500 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <p className="text-red-400 font-semibold mb-2">Error Loading Predictions</p>
+            <p className="text-slate-400">{error}</p>
           </div>
-        ) : (
-          <div className="text-center py-20 bg-slate-800 rounded-xl border border-slate-700">
-            <svg className="w-20 h-20 text-slate-600 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        ) : sortedPredictions.length === 0 ? (
+          <div className="bg-slate-800 border border-slate-700 rounded-xl p-12 text-center">
+            <svg className="w-16 h-16 text-slate-600 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            <p className="text-slate-300 text-xl font-semibold mb-2">No predictions found</p>
-            <p className="text-slate-500 text-sm">Try selecting a different week or season</p>
+            <p className="text-slate-400 text-lg mb-2">No predictions found</p>
+            <p className="text-slate-500">Try selecting a different week or adjusting your filters</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {sortedPredictions.map((prediction) => (
+              <PredictionCard
+                key={prediction.id}
+                prediction={prediction}
+              />
+            ))}
           </div>
         )}
       </div>
