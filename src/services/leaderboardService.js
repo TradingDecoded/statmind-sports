@@ -22,6 +22,7 @@ class LeaderboardService {
           u.username,
           u.display_name,
           u.avatar_url,
+          u.membership_tier,
           s.total_parlays,
           s.total_wins,
           s.total_losses,
@@ -34,6 +35,7 @@ class LeaderboardService {
          INNER JOIN user_stats s ON u.id = s.user_id
          WHERE s.total_parlays >= 3
            AND u.is_active = true
+           AND u.membership_tier IN ('premium', 'vip')
          ORDER BY s.win_rate DESC, s.total_parlays DESC
          LIMIT $1 OFFSET $2`,
         [limit, offset]
@@ -45,7 +47,8 @@ class LeaderboardService {
          FROM users u
          INNER JOIN user_stats s ON u.id = s.user_id
          WHERE s.total_parlays >= 3
-           AND u.is_active = true`
+           AND u.is_active = true
+           AND u.membership_tier IN ('premium', 'vip')`
       );
 
       return {
@@ -210,6 +213,7 @@ class LeaderboardService {
           INNER JOIN user_stats s ON u.id = s.user_id
           WHERE s.total_parlays >= 3
             AND u.is_active = true
+            AND u.membership_tier IN ('premium', 'vip')
         )
         SELECT rank FROM ranked_users WHERE id = $1`,
         [userId]
@@ -242,7 +246,8 @@ class LeaderboardService {
          FROM users u
          INNER JOIN user_stats s ON u.id = s.user_id
          WHERE s.total_parlays >= 3
-           AND u.is_active = true`
+           AND u.is_active = true
+           AND u.membership_tier IN ('premium', 'vip')`
       );
 
       const totalCompetition = compResult.rows.length > 0
