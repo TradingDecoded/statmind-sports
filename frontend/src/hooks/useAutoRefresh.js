@@ -25,27 +25,42 @@ export function useAutoRefresh(refreshFunction, options = {}) {
   const tickIntervalRef = useRef(null);
   const isVisibleRef = useRef(true);
 
-  // Check if we're in a game window
-  const isGameWindow = () => {
-    const now = new Date();
-    const day = now.getDay(); // 0=Sunday, 1=Monday, etc.
-    const hour = now.getHours(); // 0-23
+  // Check if we're in a game window OR if there are live games
+  const isGameWindow = async () => {
+    // First priority: Check if there are any live/non-final games
+    if (checkAllFinalFunction) {
+      try {
+        const allFinal = await checkAllFinalFunction();
+        if (!allFinal) {
+          // There are live games - always refresh
+          return true;
+        }
+      } catch (error) {
+        console.error('Error checking for live games:', error);
+      }
+    }
 
-    // Check if today is a game day
+    // Second priority: Check scheduled game windows
+    const now = new Date();
+    const day = now.getDay();
+    const hour = now.getHours();
+
     if (!enabledDays.includes(day)) {
       return false;
     }
 
-    // Check if we're in the time window for this day
     const [startHour, endHour] = enabledHours[day] || [0, 0];
-    return hour >= startHour && hour <= endHour;
+    const adjustedHour = hour < 6 ? hour + 24 : hour;
+    const isInTimeWindow = adjustedHour >= startHour && adjustedHour <= endHour;
+
+    return isInTimeWindow;
   };
 
   // Handle visibility change (stop when tab is hidden)
   useEffect(() => {
     const handleVisibilityChange = () => {
       isVisibleRef.current = !document.hidden;
-      
+
       if (document.hidden) {
         console.log('🔄 Page hidden - pausing auto-refresh');
       } else {
@@ -82,7 +97,7 @@ export function useAutoRefresh(refreshFunction, options = {}) {
 
     console.log('🔄 Auto-refreshing data...');
     setIsRefreshing(true);
-    
+
     try {
       await refreshFunction();
       setLastUpdated(new Date());
@@ -95,18 +110,18 @@ export function useAutoRefresh(refreshFunction, options = {}) {
   };
 
   // Start auto-refresh
-  const startAutoRefresh = () => {
+  const startAutoRefresh = async () => {
     if (intervalRef.current) {
       return; // Already running
     }
 
-    if (!isGameWindow()) {
+    if (!await isGameWindow()) {
       console.log('⏸️ Not in game window - auto-refresh not started');
       return;
     }
 
     console.log(`🔴 Starting auto-refresh (${intervalMs / 1000}s intervals)`);
-    
+
     // Perform initial refresh
     performRefresh();
 

@@ -78,7 +78,7 @@ export default function ResultCard({ result }) {
               <div>
                 <p className="text-white font-semibold">{awayTeamKey}</p>
                 <p className="text-2xl font-bold text-white">{awayScore}</p>
-                {!isHomeWinner && <span className="text-emerald-400 text-xs">WINNER</span>}
+                {!isHomeWinner && actualWinner === awayTeamKey && <span className="text-emerald-400 text-xs">WINNER</span>}
               </div>
             </div>
             
@@ -90,7 +90,7 @@ export default function ResultCard({ result }) {
               <div className="text-right">
                 <p className="text-white font-semibold">{homeTeamKey}</p>
                 <p className="text-2xl font-bold text-white">{homeScore}</p>
-                {isHomeWinner && <span className="text-emerald-400 text-xs">WINNER</span>}
+                {isHomeWinner && actualWinner === homeTeamKey && <span className="text-emerald-400 text-xs">WINNER</span>}
               </div>
               <img 
                 src={getTeamLogo(homeTeamKey)} 

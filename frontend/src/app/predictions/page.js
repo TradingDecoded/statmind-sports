@@ -272,7 +272,7 @@ export default function PredictionsPage() {
 
           {/* Center: Refresh Status */}
           <div className="flex justify-center">
-            <div className="bg-slate-800/50 border border-slate-700 rounded-lg px-4 py-2 inline-block">
+            <div className="bg-slate-800/50 border border-slate-700 rounded-lg px-6 py-3">
               <RefreshStatus
                 isRefreshing={isAutoRefreshing || loading}
                 isPaused={isPaused}

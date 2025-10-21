@@ -36,8 +36,9 @@ export default function PredictionCard({ prediction }) {
   const gameDate = new Date(date);
   const isHomeWinner = predictedWinner === homeTeamKey;
 
-  // Determine if game is finished
+  // Determine if game is finished OR has live scores
   const gameFinished = isFinal && homeScore !== null && awayScore !== null;
+  const hasScores = homeScore !== null && awayScore !== null;
   const actualHomeWinner = homeScore > awayScore;
 
   // Convert probabilities
@@ -50,7 +51,7 @@ export default function PredictionCard({ prediction }) {
   const predictedProb = predictedWinner === homeTeamKey ? homeProb : awayProb;
 
   // FINISHED GAME - Use ResultCard layout
-  if (gameFinished) {
+  if (hasScores) {
     const wasCorrect = isCorrect;
     const isHomeActualWinner = actualWinner === homeTeamKey;
 

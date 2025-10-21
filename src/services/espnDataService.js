@@ -133,33 +133,40 @@ class ESPNDataService {
       for (const event of events) {
         const competition = event.competitions[0];
 
-        // Only update if game is completed
-        if (competition.status.type.completed) {
+        // Update if game is in progress OR completed
+        const gameStatus = competition.status.type;
+        const isInProgress = gameStatus.state === 'in' || gameStatus.name.includes('Half');
+        const isCompleted = gameStatus.completed;
+
+        if (isInProgress || isCompleted) {
           const homeTeam = competition.competitors.find(c => c.homeAway === 'home');
           const awayTeam = competition.competitors.find(c => c.homeAway === 'away');
 
           const query = `
-          UPDATE games 
-          SET 
-            home_score = $1, 
-            away_score = $2,
-            is_final = true,
-            status = 'final',
-            updated_at = CURRENT_TIMESTAMP
-          WHERE game_id = $3 AND (home_score IS NULL OR is_final = false)
-          RETURNING game_id
-        `;
+       UPDATE games 
+       SET 
+         home_score = $1, 
+         away_score = $2,
+         is_final = $3,
+         status = $4,
+         updated_at = CURRENT_TIMESTAMP
+       WHERE game_id = $5 AND (home_score IS DISTINCT FROM $1 OR away_score IS DISTINCT FROM $2 OR is_final IS DISTINCT FROM $3)
+       RETURNING game_id
+     `;
 
           const values = [
-            parseInt(homeTeam.score),
-            parseInt(awayTeam.score),
+            parseInt(homeTeam.score) || 0,
+            parseInt(awayTeam.score) || 0,
+            isCompleted,
+            isCompleted ? 'final' : 'in_progress',
             event.id
           ];
 
           const result = await pool.query(query, values);
           if (result.rows.length > 0) {
             updated++;
-            console.log(`  ✓ Updated: ${homeTeam.team.abbreviation} ${homeTeam.score} - ${awayTeam.score} ${awayTeam.team.abbreviation}`);
+            const statusEmoji = isCompleted ? '✅' : '🔴 LIVE';
+            console.log(`  ${statusEmoji} ${homeTeam.team.abbreviation} ${homeTeam.score} - ${awayTeam.score} ${awayTeam.team.abbreviation}`);
           }
         }
       }

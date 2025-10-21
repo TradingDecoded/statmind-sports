@@ -33,20 +33,20 @@ cron.schedule("0 8 * * 2", async () => {
   console.log("⏰ TUESDAY 8 AM: Generating upcoming week predictions...");
   try {
     const { currentWeek, season } = getCurrentWeekInfo();
-    
+
     // Generate predictions for NEXT week (after current week's games complete)
     const targetWeek = currentWeek + 1;
-    
+
     // Handle BOTH regular season (1-18) AND playoffs (19-22)
     if (targetWeek <= 22) {
       const weekType = targetWeek <= 18 ? 'Regular Season' : 'Playoff';
       const playoffRound = getPlayoffRound(targetWeek);
-      
+
       console.log(`📊 Season: ${season}, Current Week: ${currentWeek}`);
       console.log(`🎯 Generating Week ${targetWeek} predictions (${weekType}${playoffRound ? ' - ' + playoffRound : ''})...`);
-      
+
       await predictionEngine.generatePredictions(season, targetWeek);
-      
+
       console.log(`✅ Week ${targetWeek} predictions complete!`);
     } else {
       console.log("🏁 Season complete (Super Bowl finished) - no more predictions");
@@ -80,12 +80,12 @@ cron.schedule('0 20 * * 6', async () => {
 // CONTINUOUS MONITORING (ALL YEAR)
 // ============================================
 
-// Every hour - update game scores (includes playoffs)
-cron.schedule("0 * * * *", async () => {
+// Every 5 minutes - update game scores (includes playoffs)
+cron.schedule("*/5 * * * *", async () => {
   console.log("🔁 Updating game scores (hourly)...");
   try {
     const { currentWeek, season } = getCurrentWeekInfo();
-    
+
     // Update current week (regular season or playoff)
     if (currentWeek <= 22) {
       await espnDataService.updateGameScores(season, currentWeek);
@@ -100,7 +100,7 @@ cron.schedule("0 */6 * * *", async () => {
   console.log("📆 Fetching latest schedule (every 6 hours)...");
   try {
     const { currentWeek, season } = getCurrentWeekInfo();
-    
+
     // Fetch schedule for current week (up through Super Bowl)
     if (currentWeek <= 22) {
       await espnDataService.fetchSeasonSchedule(season, currentWeek);
@@ -129,17 +129,17 @@ function getCurrentWeekInfo() {
   const now = new Date();
   const year = now.getFullYear();
   const season = now.getMonth() >= 8 ? year : year - 1;
-  
+
   const seasonStart = new Date(season, 8, 4); // September 1st
   const weeksDiff = Math.floor((now - seasonStart) / (7 * 24 * 60 * 60 * 1000));
-  
+
   // Weeks 1-18: Regular season
   // Week 19: Wild Card
   // Week 20: Divisional
   // Week 21: Conference Championships
   // Week 22: Super Bowl
   const currentWeek = Math.min(Math.max(weeksDiff + 1, 1), 22);
-  
+
   return { currentWeek, season };
 }
 
