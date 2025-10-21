@@ -410,11 +410,7 @@ export default function GameDetailModal({ prediction, isOpen, onClose }) {
 
                 {/* Footer */}
                 <div className="p-6 bg-slate-800/50 border-t border-slate-700">
-                    <p className="text-slate-400 text-sm text-center">
-                        This analysis combines historical data, current form, and statistical models to generate predictions.
-                        Past performance: <span className="text-emerald-400 font-semibold">79.7% accuracy</span> in 2024 season.
-                    </p>
-                </div>
+                    </div>
             </div>
         </div>
     );

@@ -230,11 +230,10 @@ router.delete('/:id', requireAuth, async (req, res) => {
     // Get parlay details including SMS Bucks cost and membership
     // ==========================================
     const checkResult = await client.query(
-      `SELECT up.user_id, up.is_hit, up.games, up.sms_bucks_cost, 
-          u.membership_tier, u.sms_bucks
-          FROM user_parlays up
-          JOIN users u ON up.user_id = u.id
-          WHERE up.id = $1`,
+      `SELECT up.*, u.membership_tier, u.sms_bucks
+       FROM user_parlays up
+       JOIN users u ON up.user_id = u.id
+       WHERE up.id = $1`,
       [parlayId]
     );
 
@@ -246,7 +245,9 @@ router.delete('/:id', requireAuth, async (req, res) => {
       });
     }
 
-    if (checkResult.rows[0].user_id !== userId) {
+    const parlay = checkResult.rows[0];
+
+    if (parlay.user_id !== userId) {
       await client.query('ROLLBACK');
       return res.status(403).json({
         success: false,
@@ -254,11 +255,12 @@ router.delete('/:id', requireAuth, async (req, res) => {
       });
     }
 
-    const parlayStatus = checkResult.rows[0].is_hit;
-    const games = checkResult.rows[0].games;
-    const smsBucksCost = checkResult.rows[0].sms_bucks_cost || 0;
-    const membershipTier = checkResult.rows[0].membership_tier;
-    const currentBalance = checkResult.rows[0].sms_bucks;
+    const parlayStatus = parlay.is_hit;
+    const games = parlay.games;
+    const smsBucksCost = parlay.sms_bucks_cost || 0;
+    const membershipTier = parlay.membership_tier;
+    const currentBalance = parlay.sms_bucks;
+    const parlayCompId = parlay.competition_id;
 
     // ==========================================
     // PARLAY LOCKING: Check if any game has started
@@ -359,26 +361,43 @@ router.delete('/:id', requireAuth, async (req, res) => {
     // Update competition standings (if Premium/VIP)
     // ==========================================
     if (['premium', 'vip'].includes(membershipTier)) {
-      // Get current competition ID
-      const competitionResult = await client.query(
-        `SELECT id FROM weekly_competitions 
-         WHERE status = 'active' 
-         AND start_date <= CURRENT_DATE 
-         AND end_date >= CURRENT_DATE
-         LIMIT 1`
-      );
+      if (parlayCompId) {
+        console.log(`🏆 Updating standings for competition ${parlayCompId}, user ${userId}`);
 
-      if (competitionResult.rows.length > 0) {
-        const competitionId = competitionResult.rows[0].id;
-
-        await client.query(
-          `UPDATE weekly_competition_standings
-           SET parlays_entered = GREATEST(0, parlays_entered - 1)
+        // Check current count
+        const standingsCheck = await client.query(
+          `SELECT parlays_entered FROM weekly_competition_standings
            WHERE user_id = $1 AND competition_id = $2`,
-          [userId, competitionId]
+          [userId, parlayCompId]
         );
 
-        console.log(`🏆 Updated competition standings for user ${userId}`);
+        if (standingsCheck.rows.length > 0) {
+          const currentCount = standingsCheck.rows[0].parlays_entered;
+          console.log(`   Current parlay count: ${currentCount}`);
+
+          if (currentCount <= 1) {
+            // Last parlay - remove from standings
+            await client.query(
+              `DELETE FROM weekly_competition_standings
+               WHERE user_id = $1 AND competition_id = $2`,
+              [userId, parlayCompId]
+            );
+            console.log(`   ✅ Removed user from standings (no parlays left)`);
+          } else {
+            // Decrement count
+            await client.query(
+              `UPDATE weekly_competition_standings
+               SET parlays_entered = parlays_entered - 1
+               WHERE user_id = $1 AND competition_id = $2`,
+              [userId, parlayCompId]
+            );
+            console.log(`   ✅ Decremented count to ${currentCount - 1}`);
+          }
+        } else {
+          console.log(`   ⚠️ No standings entry found`);
+        }
+      } else {
+        console.log(`🏆 Parlay not in competition, skipping standings update`);
       }
     }
 

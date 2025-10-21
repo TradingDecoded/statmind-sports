@@ -78,6 +78,16 @@ export default function MyParlaysPage() {
         }
       }
       setParlays(data.parlays || []);
+
+      // Calculate average legs
+      if (data.parlays && data.parlays.length > 0) {
+        const avgLegs = (data.parlays.reduce((sum, p) => sum + (p.leg_count || 0), 0) / data.parlays.length).toFixed(1);
+        setUserStats(prev => ({
+          ...prev,
+          avg_leg_count: avgLegs
+        }));
+      }
+      
     } catch (err) {
       setError('Failed to load parlays');
     } finally {
