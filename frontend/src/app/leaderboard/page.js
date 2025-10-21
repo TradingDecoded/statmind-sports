@@ -19,6 +19,7 @@ export default function LeaderboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const router = useRouter();
+  const [competitionInfo, setCompetitionInfo] = useState(null);
 
   useEffect(() => {
     fetchLeaderboard();
@@ -26,28 +27,38 @@ export default function LeaderboardPage() {
   }, [activeTab]);
 
   const fetchLeaderboard = async () => {
+    setLoading(true);
+    setError(null);
+
     try {
-      setLoading(true);
-      const token = localStorage.getItem('token');
-
       const endpoint = activeTab === 'overall'
-        ? '/api/leaderboard/overall'
-        : '/api/leaderboard/weekly';
+        ? '/leaderboard/overall'
+        : '/leaderboard/competition';
 
-      const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://statmindsports.com/api';
+      const response = await fetch(`${API_URL}${endpoint}`, {
+        credentials: 'include'
+      });
 
-      const response = await fetch(endpoint, { headers });
+      if (!response.ok) {
+        throw new Error('Failed to fetch leaderboard');
+      }
+
       const data = await response.json();
 
       if (data.success) {
         setLeaderboardData(data.leaderboard);
-        setMyRank(data.my_rank);
+
+        // Store competition info if it exists
+        if (activeTab === 'weekly' && data.competition) {
+          setCompetitionInfo(data.competition);
+        }
       } else {
-        setError(data.error);
+        throw new Error(data.error || 'Failed to load leaderboard');
       }
     } catch (err) {
-      console.error('Error fetching leaderboard:', err);
-      setError('Failed to load leaderboard');
+      console.error('Leaderboard fetch error:', err);
+      setError(err.message);
     } finally {
       setLoading(false);
     }
@@ -147,6 +158,31 @@ export default function LeaderboardPage() {
           </button>
         </div>
 
+        {/* Competition Prize Banner - Shows only on Weekly tab */}
+        {activeTab === 'weekly' && competitionInfo ? (
+          <div className="bg-gradient-to-r from-amber-600 to-orange-600 rounded-lg p-6 mb-6 shadow-xl">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-2xl font-bold text-white mb-2">
+                  🏆 Week {competitionInfo.week_number} Competition
+                </div>
+                <div className="text-amber-100">
+                  Prize Pool: <span className="text-3xl font-bold text-white">${competitionInfo.prize_amount.toFixed(2)}</span>
+                  {competitionInfo.is_rollover && (
+                    <span className="ml-3 bg-yellow-400 text-gray-900 px-3 py-1 rounded-full text-sm font-bold">
+                      🎰 ROLLOVER!
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-amber-100 text-sm">Competition Status</div>
+                <div className="text-white font-bold text-xl capitalize">{competitionInfo.status}</div>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
         {/* Competition Rules Link - Shows only on Weekly tab */}
         {activeTab === 'weekly' ? (
           <div className="text-center mb-6 mt-4">
@@ -186,86 +222,133 @@ export default function LeaderboardPage() {
                 <tr>
                   <th className="px-6 py-4 text-left text-sm font-semibold text-gray-400">Rank</th>
                   <th className="px-6 py-4 text-left text-sm font-semibold text-gray-400">Player</th>
-                  <th className="px-6 py-4 text-center text-sm font-semibold text-gray-400">Parlays</th>
-                  <th className="px-6 py-4 text-center text-sm font-semibold text-gray-400">Win Rate</th>
-                  <th className="px-6 py-4 text-center text-sm font-semibold text-gray-400">Record</th>
-                  <th className="px-6 py-4 text-center text-sm font-semibold text-gray-400">Streak</th>
-                  <th className="px-6 py-4 text-center text-sm font-semibold text-gray-400">Accuracy</th>
+
+                  {activeTab === 'overall' ? (
+                    <>
+                      <th className="px-6 py-4 text-center text-sm font-semibold text-gray-400">Parlays</th>
+                      <th className="px-6 py-4 text-center text-sm font-semibold text-gray-400">Win Rate</th>
+                      <th className="px-6 py-4 text-center text-sm font-semibold text-gray-400">Record</th>
+                      <th className="px-6 py-4 text-center text-sm font-semibold text-gray-400">Streak</th>
+                      <th className="px-6 py-4 text-center text-sm font-semibold text-gray-400">Accuracy</th>
+                    </>
+                  ) : (
+                    <>
+                      <th className="px-6 py-4 text-center text-sm font-semibold text-gray-400">Points</th>
+                      <th className="px-6 py-4 text-center text-sm font-semibold text-gray-400">Parlays Entered</th>
+                      <th className="px-6 py-4 text-center text-sm font-semibold text-gray-400">Parlays Won</th>
+                      <th className="px-6 py-4 text-center text-sm font-semibold text-gray-400">Tier</th>
+                    </>
+                  )}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-700">
                 {leaderboardData.map((user, index) => {
                   const rank = parseInt(user.rank);
                   const isTopThree = rank <= 3;
-                  const totalParlays = activeTab === 'overall'
-                    ? user.total_parlays
-                    : user.weekly_parlays;
-                  const wins = activeTab === 'overall'
-                    ? user.total_wins
-                    : user.weekly_wins;
-                  const losses = activeTab === 'overall'
-                    ? user.total_losses
-                    : user.weekly_losses;
-                  const winRate = activeTab === 'overall'
-                    ? user.win_rate
-                    : user.weekly_win_rate;
 
                   return (
-                    <tr
-                      key={user.id}
-                      className={`hover:bg-gray-700 transition-colors cursor-pointer ${isTopThree ? 'bg-gradient-to-r from-yellow-900/20 to-transparent' : ''
-                        }`}
-                      onClick={() => router.push(`/profile/${user.username}`)}
-                    >
+                    <tr key={user.id} className={`hover:bg-gray-750 transition-colors ${isTopThree ? 'bg-gray-800' : ''}`}>
+                      {/* Rank */}
                       <td className="px-6 py-4">
-                        <div className="text-2xl font-bold">
-                          {getRankBadge(rank)}
+                        <div className="flex items-center gap-2">
+                          {rank === 1 && <span className="text-2xl">🥇</span>}
+                          {rank === 2 && <span className="text-2xl">🥈</span>}
+                          {rank === 3 && <span className="text-2xl">🥉</span>}
+                          <span className={`text-lg font-bold ${isTopThree ? 'text-amber-400' : 'text-gray-400'}`}>
+                            #{rank}
+                          </span>
                         </div>
                       </td>
+
+                      {/* Player */}
                       <td className="px-6 py-4">
-                        <div className="flex items-center space-x-3">
-                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold">
-                            {user.username.charAt(0).toUpperCase()}
-                          </div>
-                          <div>
-                            <div className="font-semibold text-white">
-                              {user.display_name || user.username}
+                        <div className="flex items-center gap-3">
+                          {user.avatar_url ? (
+                            <img src={user.avatar_url} alt="" className="w-10 h-10 rounded-full" />
+                          ) : (
+                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold">
+                              {(user.display_name || user.username).charAt(0).toUpperCase()}
                             </div>
+                          )}
+                          <div>
+                            <div className="font-semibold text-white">{user.display_name || user.username}</div>
                             <div className="text-sm text-gray-400">@{user.username}</div>
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-center">
-                        <div className="text-lg font-semibold">{totalParlays}</div>
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                        <div className={`text-lg font-bold ${winRate >= 60 ? 'text-green-400' :
-                          winRate >= 50 ? 'text-yellow-400' :
-                            'text-red-400'
-                          }`}>
-                          {winRate}%
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                        <div className="text-sm">
-                          <span className="text-green-400">{wins}W</span>
-                          {' - '}
-                          <span className="text-red-400">{losses}L</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                        <div className={`text-lg font-semibold ${user.current_streak > 0 ? 'text-green-400' :
-                          user.current_streak < 0 ? 'text-red-400' :
-                            'text-gray-400'
-                          }`}>
-                          {getStreakEmoji(user.current_streak)} {user.current_streak}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                        <div className="text-sm text-gray-300">
-                          {user.leg_accuracy ? `${user.leg_accuracy}%` : '-'}
-                        </div>
-                      </td>
+
+                      {/* Different columns based on tab */}
+                      {activeTab === 'overall' ? (
+                        <>
+                          {/* Parlays */}
+                          <td className="px-6 py-4 text-center">
+                            <span className="text-white font-semibold">{user.total_parlays || 0}</span>
+                          </td>
+
+                          {/* Win Rate */}
+                          <td className="px-6 py-4 text-center">
+                            <span className={`font-bold ${parseFloat(user.win_rate) >= 60 ? 'text-green-400' :
+                              parseFloat(user.win_rate) >= 50 ? 'text-yellow-400' :
+                                'text-red-400'
+                              }`}>
+                              {parseFloat(user.win_rate).toFixed(1)}%
+                            </span>
+                          </td>
+
+                          {/* Record */}
+                          <td className="px-6 py-4 text-center">
+                            <div className="text-sm">
+                              <span className="text-green-400">{user.total_wins || 0}W</span>
+                              <span className="text-gray-500"> - </span>
+                              <span className="text-red-400">{user.total_losses || 0}L</span>
+                            </div>
+                          </td>
+
+                          {/* Streak */}
+                          <td className="px-6 py-4 text-center">
+                            <span className={`font-semibold ${user.current_streak > 0 ? 'text-green-400' :
+                              user.current_streak < 0 ? 'text-red-400' :
+                                'text-gray-400'
+                              }`}>
+                              {user.current_streak > 0 ? `🔥 ${user.current_streak}` :
+                                user.current_streak < 0 ? `❄️ ${Math.abs(user.current_streak)}` :
+                                  '-'}
+                            </span>
+                          </td>
+
+                          {/* Leg Accuracy */}
+                          <td className="px-6 py-4 text-center">
+                            <span className="text-gray-300">{parseFloat(user.leg_accuracy || 0).toFixed(1)}%</span>
+                          </td>
+                        </>
+                      ) : (
+                        <>
+                          {/* Competition Points */}
+                          <td className="px-6 py-4 text-center">
+                            <span className="text-xl font-bold text-amber-400">{user.total_points || 0}</span>
+                          </td>
+
+                          {/* Parlays Entered */}
+                          <td className="px-6 py-4 text-center">
+                            <span className="text-white font-semibold">{user.parlays_entered || 0}</span>
+                          </td>
+
+                          {/* Parlays Won */}
+                          <td className="px-6 py-4 text-center">
+                            <span className="text-green-400 font-semibold">{user.parlays_won || 0}</span>
+                          </td>
+
+                          {/* Membership Tier */}
+                          <td className="px-6 py-4 text-center">
+                            <span className={`px-3 py-1 rounded-full text-xs font-bold ${user.membership_tier === 'vip' ? 'bg-purple-600 text-white' :
+                              user.membership_tier === 'premium' ? 'bg-blue-600 text-white' :
+                                'bg-gray-600 text-gray-300'
+                              }`}>
+                              {user.membership_tier?.toUpperCase() || 'FREE'}
+                            </span>
+                          </td>
+                        </>
+                      )}
                     </tr>
                   );
                 })}
