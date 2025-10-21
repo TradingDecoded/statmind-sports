@@ -231,8 +231,8 @@ class ParlayService {
       let competitionId = null;
       if (!isPracticParlay) {
         const competitionResult = await client.query(
-          'SELECT id FROM weekly_competitions WHERE year = $1 AND week_number = $2',
-          [currentYear, currentWeek]
+          'SELECT id FROM weekly_competitions WHERE season = $1 AND nfl_week = $2 AND status = $3',
+          [season, week, 'active']
         );
 
         competitionId = competitionResult.rows.length > 0
@@ -298,7 +298,23 @@ class ParlayService {
             `Competition entry: ${parlayName} (${legCount} legs)`, parlayId]
         );
 
-        // 12. Update weekly parlay count (competition entries only)
+        // 12. Add user to competition standings (or update parlay count)
+        if (competitionId) {
+          await client.query(
+            `INSERT INTO weekly_competition_standings 
+           (competition_id, user_id, parlays_entered, total_points, parlays_won, rank)
+           VALUES ($1, $2, 1, 0, 0, 1)
+           ON CONFLICT (competition_id, user_id) 
+           DO UPDATE SET
+             parlays_entered = weekly_competition_standings.parlays_entered + 1,
+             updated_at = NOW()`,
+            [competitionId, userId]
+          );
+
+          console.log(`✅ Updated competition standings for user ${userId}`);
+        }
+
+        // 13. Update weekly parlay count (competition entries only)
         await client.query(
           `INSERT INTO weekly_parlay_counts (user_id, year, week_number, parlay_count, last_parlay_date)
          VALUES ($1, $2, $3, 1, NOW())
@@ -313,7 +329,19 @@ class ParlayService {
         console.log(`✅ Practice parlay created! No SMS Bucks deducted.`);
       }
 
-      // 13. Commit transaction
+      // 14. Update user_stats (increment total and pending parlays)
+      await client.query(
+        `UPDATE user_stats 
+         SET total_parlays = total_parlays + 1,
+             pending_parlays = pending_parlays + 1,
+             last_updated = NOW()
+         WHERE user_id = $1`,
+        [userId]
+      );
+
+      console.log(`✅ Updated user_stats for user ${userId}`);
+
+      // 15. Commit transaction
       await client.query('COMMIT');
 
       return {

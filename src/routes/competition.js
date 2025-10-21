@@ -107,12 +107,35 @@ router.get('/status', requireAuth, async (req, res) => {
       parlayCount = parseInt(parlayResult.rows[0].count);
     }
 
+    // Determine status type for banner display
+    let statusType = 'default'; // Build for Fun (free tier or not opted in)
+    const maxParlays = 20; // Maximum parlays per week
+    const minToQualify = 1; // Minimum to qualify (changed from 3 to 1)
+
+    if (status.isOptedIn && status.isCompetitionWindowOpen) {
+      // User is opted in and window is open
+      if (parlayCount >= maxParlays) {
+        statusType = 'max_reached';
+      } else if (parlayCount >= minToQualify) {
+        statusType = 'qualified';
+      } else {
+        statusType = 'not_qualified';
+      }
+    }
+
     res.json({
       success: true,
       status: {
         ...status,
         parlayCount,
-        competitionId: competition ? competition.id : null
+        competitionId: competition ? competition.id : null,
+        statusType, // NEW: Add statusType for banner
+        maxParlays,
+        minToQualify,
+        competition: competition ? {
+          prizeAmount: parseFloat(competition.prize_amount),
+          isRollover: competition.is_rollover
+        } : null
       }
     });
 
@@ -133,7 +156,7 @@ router.post('/opt-in', requireAuth, async (req, res) => {
   try {
     const userId = req.user.id;
     const result = await competitionService.optInToCompetition(userId);
-    
+
     if (!result.success) {
       return res.status(400).json(result);
     }
@@ -142,9 +165,9 @@ router.post('/opt-in', requireAuth, async (req, res) => {
 
   } catch (error) {
     console.error('Error opting in:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Server error' 
+    res.status(500).json({
+      success: false,
+      error: 'Server error'
     });
   }
 });
@@ -157,14 +180,14 @@ router.post('/opt-out', requireAuth, async (req, res) => {
   try {
     const userId = req.user.id;
     const result = await competitionService.optOutOfCompetition(userId);
-    
+
     res.json(result);
 
   } catch (error) {
     console.error('Error opting out:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Server error' 
+    res.status(500).json({
+      success: false,
+      error: 'Server error'
     });
   }
 });

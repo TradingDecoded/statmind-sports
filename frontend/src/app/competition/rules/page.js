@@ -38,11 +38,41 @@ export default function CompetitionRulesPage() {
     }
   };
 
-  const handleProceed = () => {
+  const [opting, setOpting] = useState(false);
+
+  const handleProceed = async () => {
     if (dontShowAgain) {
       localStorage.setItem('competition_rules_opted_out', 'true');
     }
-    router.push('/parlay-builder');
+
+    // Opt user into competition
+    setOpting(true);
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://statmindsports.com/api';
+      const token = localStorage.getItem('authToken');
+
+      const response = await fetch(`${apiUrl}/competition/opt-in`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        // Successfully opted in - go to parlay builder
+        router.push('/parlay-builder');
+      } else {
+        alert(`Could not enter competition: ${data.message}`);
+        setOpting(false);
+      }
+    } catch (error) {
+      console.error('Error opting in:', error);
+      alert('Error entering competition. Please try again.');
+      setOpting(false);
+    }
   };
 
   const handleViewLeaderboard = () => {
@@ -258,9 +288,10 @@ export default function CompetitionRulesPage() {
         <div className="text-center">
           <button
             onClick={handleProceed}
+            disabled={opting}
             className="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white px-12 py-4 rounded-xl font-bold text-xl shadow-2xl hover:scale-105 transition-all"
           >
-            Create My Parlay →
+            {opting ? 'Entering Competition...' : 'Create My Parlay →'}
           </button>
           <p className="text-slate-400 text-sm mt-4">
             You have <span className="text-white font-semibold">{user?.sms_bucks || 0} SMS Bucks</span> available

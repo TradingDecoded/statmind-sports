@@ -288,13 +288,68 @@ class LeaderboardService {
           MAX(s.current_streak) as current_best_streak
          FROM users u
          INNER JOIN user_stats s ON u.id = s.user_id
-         WHERE u.is_active = true`
+         WHERE u.is_active = true
+           AND s.total_parlays >= 3`
       );
 
       return result.rows[0];
 
     } catch (error) {
       console.error('Error fetching leaderboard stats:', error);
+      throw error;
+    }
+  }
+
+  // ==========================================
+  // GET COMPETITION STATS
+  // Statistics for current week's competition
+  // ==========================================
+  async getCompetitionStats() {
+    try {
+      // Get current active competition
+      const compResult = await pool.query(
+        `SELECT id FROM weekly_competitions 
+         WHERE status = 'active' 
+         ORDER BY created_at DESC 
+         LIMIT 1`
+      );
+
+      if (compResult.rows.length === 0) {
+        return {
+          total_users: 0,
+          total_parlays: 0,
+          avg_win_rate: 0,
+          best_streak_ever: 0
+        };
+      }
+
+      const competitionId = compResult.rows[0].id;
+
+      // Get competition-specific stats
+      const statsResult = await pool.query(
+        `SELECT 
+          COUNT(DISTINCT wcs.user_id) as total_users,
+          SUM(wcs.parlays_entered) as total_parlays,
+          COALESCE(ROUND(AVG(
+            CASE 
+              WHEN wcs.parlays_entered > 0 
+              THEN (wcs.parlays_won::DECIMAL / wcs.parlays_entered) * 100 
+              ELSE 0 
+            END
+          ), 2), 0) as avg_win_rate,
+          COALESCE(MAX(s.best_streak), 0) as best_streak_ever
+         FROM weekly_competition_standings wcs
+         INNER JOIN users u ON wcs.user_id = u.id
+         LEFT JOIN user_stats s ON u.id = s.user_id
+         WHERE wcs.competition_id = $1
+           AND u.is_active = true`,
+        [competitionId]
+      );
+
+      return statsResult.rows[0];
+
+    } catch (error) {
+      console.error('Error fetching competition stats:', error);
       throw error;
     }
   }

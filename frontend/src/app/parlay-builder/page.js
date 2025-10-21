@@ -233,7 +233,9 @@ export default function ParlayBuilderPage() {
       alert('Parlay saved successfully! 🎉');
       router.push('/my-parlays');
     } catch (err) {
-      alert('Failed to save parlay. Please try again.');
+      // Show the actual error message from the backend
+      const errorMessage = err.message || 'Failed to save parlay. Please try again.';
+      alert(errorMessage);
       console.error('Save error:', err);
     } finally {
       setSaving(false);

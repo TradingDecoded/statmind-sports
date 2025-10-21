@@ -22,9 +22,9 @@ export default function LeaderboardPage() {
   const [competitionInfo, setCompetitionInfo] = useState(null);
 
   useEffect(() => {
-    fetchLeaderboard();
     fetchStats();
-  }, [activeTab]);
+    fetchLeaderboard();
+  }, [activeTab]); // Re-fetch when tab changes
 
   const fetchLeaderboard = async () => {
     setLoading(true);
@@ -66,14 +66,25 @@ export default function LeaderboardPage() {
 
   const fetchStats = async () => {
     try {
-      const response = await fetch('/api/leaderboard/stats');
-      const data = await response.json();
+      const token = localStorage.getItem('authToken');
 
-      if (data.success) {
-        setStats(data.stats);
-      }
+      // Use different endpoint based on active tab
+      const endpoint = activeTab === 'weekly'
+        ? '/api/leaderboard/competition-stats'
+        : '/api/leaderboard/stats';
+
+      const response = await fetch(endpoint, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) throw new Error('Failed to fetch stats');
+
+      const data = await response.json();
+      setStats(data.stats);
     } catch (err) {
-      console.error('Error fetching stats:', err);
+      console.error('Stats error:', err);
     }
   };
 
@@ -105,7 +116,7 @@ export default function LeaderboardPage() {
 
         {/* Platform Stats */}
         {stats && (
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+          <div className={`grid grid-cols-1 ${activeTab === 'weekly' ? 'md:grid-cols-3' : 'md:grid-cols-4'} gap-4 mb-8`}>
             <div className="bg-gray-800 rounded-lg p-4 text-center">
               <div className="text-3xl font-bold text-blue-400">{stats.total_users}</div>
               <div className="text-sm text-gray-400">Total Players</div>
@@ -118,10 +129,12 @@ export default function LeaderboardPage() {
               <div className="text-3xl font-bold text-yellow-400">{stats.avg_win_rate}%</div>
               <div className="text-sm text-gray-400">Avg Win Rate</div>
             </div>
-            <div className="bg-gray-800 rounded-lg p-4 text-center">
-              <div className="text-3xl font-bold text-orange-400">🔥 {stats.best_streak_ever}</div>
-              <div className="text-sm text-gray-400">Best Streak Ever</div>
-            </div>
+            {activeTab === 'overall' && (
+              <div className="bg-gray-800 rounded-lg p-4 text-center">
+                <div className="text-3xl font-bold text-orange-400">🔥 {stats.best_streak_ever}</div>
+                <div className="text-sm text-gray-400">Best Streak Ever</div>
+              </div>
+            )}
           </div>
         )}
 
