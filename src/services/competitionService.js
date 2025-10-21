@@ -53,105 +53,67 @@ class CompetitionService {
   // ==========================================
   async getUserCompetitionStatus(userId) {
     try {
-      // Get current active competition
-      const competition = await this.getCurrentCompetition();
+      console.log(`\n🔍 Checking competition status for user ${userId}`);
 
-      if (!competition) {
-        return {
-          canCompete: false,
-          reason: 'no_active_competition',
-          isPracticeMode: true,
-          message: 'No active competition - all parlays are free practice'
-        };
-      }
-
-      // Check if competition window is open
-      const windowOpen = this.isCompetitionWindowOpen(competition);
-
-      if (!windowOpen) {
-        return {
-          canCompete: false,
-          reason: 'window_closed',
-          isPracticeMode: true,
-          message: 'Competition window closed - all parlays are free practice',
-          competition: {
-            id: competition.id,
-            prizeAmount: parseFloat(competition.prize_amount),
-            nextStart: competition.start_datetime,
-            endsAt: competition.end_datetime
-          }
-        };
-      }
-
-      // Get user info
+      // Get user details
       const userResult = await pool.query(
-        'SELECT membership_tier, competition_opted_in, sms_bucks FROM users WHERE id = $1',
+        'SELECT account_tier, competition_opted_in FROM users WHERE id = $1',
         [userId]
       );
 
       if (userResult.rows.length === 0) {
-        return {
-          canCompete: false,
-          reason: 'user_not_found',
-          isPracticeMode: true,
-          message: 'User not found'
-        };
+        throw new Error('User not found');
       }
 
-      const user = userResult.rows[0];
+      const { account_tier, competition_opted_in } = userResult.rows[0];
 
-      // Free tier users always in practice mode
-      if (user.membership_tier === 'free') {
-        return {
-          canCompete: false,
-          reason: 'free_tier',
-          isPracticeMode: true,
-          message: 'Free tier - upgrade to Premium/VIP to enter competitions',
-          competition: {
-            id: competition.id,
-            prizeAmount: parseFloat(competition.prize_amount),    // Add parseFloat
-            endsAt: competition.end_datetime                      // Keep as is
-          }
-        };
+      console.log(`   - Account Tier: ${account_tier}`);
+      console.log(`   - Competition Opted In: ${competition_opted_in}`);
+
+      // Get current competition
+      const competition = await this.getCurrentCompetition();
+
+      // Check if competition window is open
+      const isCompetitionWindowOpen = this.isCompetitionWindowOpen(competition);
+      console.log(`   - Competition Window Open: ${isCompetitionWindowOpen}`);
+
+      // Determine opt-in status
+      const isOptedIn = competition_opted_in === true;
+
+      // Determine if user should create free parlays
+      let shouldCreateFreeParlays = false;
+
+      // Free tier ALWAYS gets free parlays (never competes)
+      if (account_tier === 'free') {
+        shouldCreateFreeParlays = true;
+        console.log(`   → Free tier: shouldCreateFreeParlays = TRUE (never competes)`);
       }
-
-      // Premium/VIP but not opted in = practice mode
-      if (!user.competition_opted_in) {
-        return {
-          canCompete: true,
-          reason: 'not_opted_in',
-          isPracticeMode: true,
-          canOptIn: true,
-          message: 'Create free practice parlays or opt in to compete for $' + parseFloat(competition.prize_amount),
-          competition: {
-            id: competition.id,
-            prizeAmount: parseFloat(competition.prize_amount),    // Add parseFloat
-            endsAt: competition.end_datetime                      // Keep as is
-          },
-          user: {
-            smsBucks: user.sms_bucks
-          }
-        };
-      }
-
-      // Premium/VIP and opted in = competition mode
-      return {
-        canCompete: true,
-        reason: 'opted_in',
-        isPracticeMode: false,
-        message: 'Competition mode active - parlays cost 100 SMS Bucks',
-        competition: {
-          id: competition.id,
-          prizeAmount: parseFloat(competition.prize_amount),    // Add parseFloat
-          endsAt: competition.end_datetime                      // Keep as is
-        },
-        user: {
-          smsBucks: user.sms_bucks
+      // Premium/VIP: Free parlays if NOT opted in OR window closed
+      else if (account_tier === 'premium' || account_tier === 'vip') {
+        if (!isOptedIn) {
+          shouldCreateFreeParlays = true;
+          console.log(`   → Premium/VIP not opted in: shouldCreateFreeParlays = TRUE`);
+        } else if (!isCompetitionWindowOpen) {
+          shouldCreateFreeParlays = true;
+          console.log(`   → Competition window closed: shouldCreateFreeParlays = TRUE`);
+        } else {
+          shouldCreateFreeParlays = false;
+          console.log(`   → Premium/VIP opted in + window open: shouldCreateFreeParlays = FALSE (paid)`);
         }
+      }
+
+      console.log(`\n📊 Final Status: shouldCreateFreeParlays = ${shouldCreateFreeParlays}\n`);
+
+      return {
+        accountTier: account_tier,
+        isOptedIn,
+        isCompetitionWindowOpen,
+        shouldCreateFreeParlays,
+        canOptIn: (account_tier === 'premium' || account_tier === 'vip') && isCompetitionWindowOpen
       };
 
     } catch (error) {
-      console.error('Error getting user competition status:', error);
+      console.error('Error getting competition status:', error);
       throw error;
     }
   }
