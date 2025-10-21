@@ -13,10 +13,18 @@ class CompetitionService {
   async getCurrentCompetition() {
     try {
       const result = await pool.query(
-        `SELECT * FROM weekly_competitions 
-         WHERE status = 'active' 
-         ORDER BY created_at DESC 
-         LIMIT 1`
+        `SELECT 
+        wc.*,
+        COALESCE(
+          (SELECT COUNT(DISTINCT user_id) 
+           FROM weekly_competition_standings 
+           WHERE competition_id = wc.id),
+          0
+        ) as total_participants
+       FROM weekly_competitions wc
+       WHERE wc.status = 'active' 
+       ORDER BY wc.created_at DESC 
+       LIMIT 1`
       );
 
       if (result.rows.length === 0) {

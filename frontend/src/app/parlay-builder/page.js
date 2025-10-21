@@ -17,12 +17,13 @@ export default function ParlayBuilderPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [calculating, setCalculating] = useState(false);
-  const [calculatedProb, setCalculatedProb] = useState(null);
+  const [calculation, setCalculation] = useState(null);
   const [error, setError] = useState(null);
   const [currentWeek, setCurrentWeek] = useState(null);
   const [currentSeason, setCurrentSeason] = useState(2025);
   const { refreshBalance } = useSMSBucks();
   const [competitionStatus, setCompetitionStatus] = useState(null);
+  const [userParlays, setUserParlays] = useState([]);
 
   useEffect(() => {
     // Don't redirect while still checking auth
@@ -81,6 +82,29 @@ export default function ParlayBuilderPage() {
     }
   };
 
+  const fetchUserParlays = async () => {
+    try {
+      const token = localStorage.getItem('authToken');
+      if (!token) return;
+
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://statmindsports.com/api';
+      const response = await fetch(`${apiUrl}/parlay/mine?season=${currentSeason}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        // Filter to only show parlays for the current week
+        const currentWeekParlays = data.parlays.filter(p => p.week === currentWeek);
+        setUserParlays(currentWeekParlays);
+      }
+    } catch (error) {
+      console.error('Error fetching user parlays:', error);
+    }
+  };
+
   const toggleGamePick = (game, pickedWinner) => {
     setSelectedPicks(prevPicks => {
       const existingIndex = prevPicks.findIndex(p => p.game_id === game.id);
@@ -115,13 +139,14 @@ export default function ParlayBuilderPage() {
     if (selectedPicks.length >= 2) {
       calculateProbability();
     } else {
-      setCalculatedProb(null);
+      setCalculation(null);
     }
   }, [selectedPicks]);
 
   useEffect(() => {
     fetchAvailableGames();
     fetchCompetitionStatus();
+    fetchUserParlays();
   }, [currentWeek]);
 
   const calculateProbability = async () => {
@@ -161,7 +186,7 @@ export default function ParlayBuilderPage() {
       console.log('🔍 Probability response:', data);
       console.log('🔍 combinedProbability value:', data.combinedProbability);
       console.log('🔍 Type:', typeof data.combinedProbability);
-      setCalculatedProb(data);
+      setCalculation(data);
       setCalculating(false);
     } catch (err) {
       console.error('Error calculating:', err);
@@ -275,7 +300,12 @@ export default function ParlayBuilderPage() {
           {/* Right: Competition Status Banner */}
           {competitionStatus && (
             <div className="flex-shrink-0 w-[700px]">
-              <CompetitionStatusBanner status={competitionStatus} />
+              <CompetitionStatusBanner
+                status={{
+                  ...competitionStatus,
+                  parlayCount: userParlays.length
+                }}
+              />
             </div>
           )}
         </div>
@@ -451,10 +481,12 @@ export default function ParlayBuilderPage() {
             </div>
           </div>
 
-          {/* Right Column: Selected Picks & Calculator */}
-          <div className="lg:col-span-1">
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 sticky top-4">
-              <h2 className="text-2xl font-bold text-white mb-4">
+          {/* Right Column: Your Parlay + Existing Parlays */}
+          <div className="lg:col-span-1 space-y-6">
+
+            {/* Current Parlay Being Built */}
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 sticky top-6">
+              <h2 className="text-2xl font-bold text-white mb-6">
                 Your Parlay ({selectedPicks.length})
               </h2>
 
@@ -463,83 +495,131 @@ export default function ParlayBuilderPage() {
                   Select games from the left to build your parlay
                 </p>
               ) : (
-                <>
-                  {/* Selected Picks List */}
-                  <div className="space-y-2 mb-6">
-                    {selectedPicks.map((pick, index) => (
-                      <div
-                        key={pick.game_id}
-                        className="bg-slate-800 rounded-lg p-3 flex items-center justify-between"
-                      >
-                        <div>
-                          <div className="text-white font-semibold">
-                            {index + 1}. {pick.picked_winner}
-                          </div>
-                          <div className="text-xs text-slate-400">
-                            {pick.away_team} @ {pick.home_team}
-                          </div>
-                        </div>
+                <div className="space-y-4">
+                  {/* Selected picks display - keep existing code */}
+                  {selectedPicks.map((pick, index) => (
+                    <div key={index} className="bg-slate-800/50 rounded-lg p-3 border border-slate-700">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-white font-semibold text-sm">{pick.picked_winner}</span>
                         <button
-                          onClick={() => toggleGamePick({ id: pick.game_id }, pick.picked_winner)}
-                          className="text-red-400 hover:text-red-300 text-xl font-bold"
+                          onClick={() => handleRemovePick(pick.game_id)}
+                          className="text-red-400 hover:text-red-300 text-xs"
                         >
-                          ✕
+                          Remove
                         </button>
                       </div>
-                    ))}
-                  </div>
-
-                  {/* Probability Calculator */}
-                  {selectedPicks.length >= 2 && (
-                    <div className="bg-gradient-to-br from-emerald-600 to-teal-600 rounded-lg p-4 mb-6">
-                      <div className="text-white text-center">
-                        <div className="text-sm opacity-90 mb-1">Combined Win Probability</div>
-                        {calculating ? (
-                          <div className="text-3xl font-bold">Calculating...</div>
-                        ) : calculatedProb ? (
-                          <>
-                            <div className="text-4xl font-bold mb-2">
-                              {calculatedProb.combinedProbability}%
-                            </div>
-                            <div className="text-xs opacity-90">
-                              Risk Level: <span className="font-bold">{calculatedProb.riskLevel}</span>
-                            </div>
-                          </>
-                        ) : (
-                          <div className="text-3xl font-bold">--</div>
-                        )}
-                      </div>
+                      <p className="text-slate-400 text-xs">
+                        vs {pick.opponent} • {pick.ai_probability}% AI confidence
+                      </p>
                     </div>
-                  )}
+                  ))}
 
                   {/* Parlay Name Input */}
-                  <div className="mb-4">
-                    <label className="block text-slate-400 text-sm mb-2">
+                  <div className="mt-4">
+                    <label className="block text-slate-400 text-sm font-medium mb-2">
                       Parlay Name
                     </label>
                     <input
                       type="text"
                       value={parlayName}
                       onChange={(e) => setParlayName(e.target.value)}
-                      placeholder="e.g., Week 7 Big Plays"
-                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      placeholder="Enter parlay name..."
+                      maxLength={100}
+                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition"
                     />
                   </div>
 
-                  {/* Save Button */}
+                  {/* Parlay Stats - keep existing code */}
+                  {calculation && (
+                    <div className="bg-slate-800/30 rounded-lg p-4 mt-4 space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-slate-400">Combined Probability:</span>
+                        <span className="text-white font-semibold">{calculation.combinedProbability}%</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-slate-400">Risk Level:</span>
+                        <span className={`font-semibold ${calculation.riskLevel === 'Low' ? 'text-green-400' :
+                          calculation.riskLevel === 'Medium' ? 'text-yellow-400' : 'text-red-400'
+                          }`}>
+                          {calculation.riskLevel}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Save Button - keep existing code */}
                   <button
                     onClick={handleSaveParlay}
                     disabled={saving || selectedPicks.length < 2 || !parlayName.trim()}
-                    className={`w-full py-3 rounded-lg font-bold text-white transition-all ${saving || selectedPicks.length < 2 || !parlayName.trim()
-                      ? 'bg-slate-700 cursor-not-allowed'
-                      : 'bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700'
-                      }`}
+                    className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-700 disabled:cursor-not-allowed text-white font-bold py-3 px-4 rounded-lg transition mt-4"
                   >
-                    {saving ? 'Saving...' : '💾 Save Parlay'}
+                    {saving ? 'Saving...' : 'Save Parlay'}
                   </button>
-                </>
+                </div>
               )}
             </div>
+
+            {/* Existing Parlays for This Week */}
+            {userParlays.length > 0 && (
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+                <h3 className="text-xl font-bold text-white mb-4">
+                  Your Week {currentWeek} Parlays ({userParlays.length})
+                </h3>
+
+                <div className="space-y-3">
+                  {userParlays.map(parlay => (
+                    <div
+                      key={parlay.id}
+                      className="bg-slate-800/50 border border-slate-700 rounded-lg p-4 hover:border-slate-600 transition-colors cursor-pointer"
+                      onClick={() => router.push('/my-parlays')}
+                    >
+                      <div className="flex items-start justify-between mb-2">
+                        <div>
+                          <h4 className="text-white font-semibold text-sm">{parlay.parlay_name}</h4>
+                          <p className="text-slate-400 text-xs mt-1">
+                            {parlay.leg_count} legs • {parlay.risk_level} risk
+                          </p>
+                        </div>
+
+                        {/* Status Badge */}
+                        <span className={`px-2 py-1 rounded text-xs font-semibold ${parlay.is_hit === null
+                          ? 'bg-yellow-900/30 text-yellow-400'
+                          : parlay.is_hit === true
+                            ? 'bg-green-900/30 text-green-400'
+                            : 'bg-red-900/30 text-red-400'
+                          }`}>
+                          {parlay.is_hit === null ? 'Pending' : parlay.is_hit ? 'Won' : 'Lost'}
+                        </span>
+                      </div>
+
+                      {/* Practice/Competition Badge */}
+                      <div className="flex items-center gap-2 mt-2">
+                        {parlay.is_practice_parlay ? (
+                          <span className="text-xs bg-blue-900/30 text-blue-400 px-2 py-0.5 rounded">
+                            🎯 Practice
+                          </span>
+                        ) : (
+                          <span className="text-xs bg-amber-900/30 text-amber-400 px-2 py-0.5 rounded">
+                            🏆 Competition
+                          </span>
+                        )}
+
+                        <span className="text-xs text-slate-500">
+                          {new Date(parlay.created_at).toLocaleDateString()}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <button
+                  onClick={() => router.push('/my-parlays')}
+                  className="w-full mt-4 bg-slate-700 hover:bg-slate-600 text-white font-semibold py-2 px-4 rounded-lg transition text-sm"
+                >
+                  View All Parlays →
+                </button>
+              </div>
+            )}
           </div>
 
         </div>

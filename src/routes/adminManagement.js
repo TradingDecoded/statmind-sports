@@ -897,16 +897,43 @@ router.post('/reset/all', async (req, res) => {
     await client.query('DELETE FROM weekly_competition_standings');
     console.log('✅ Competition data deleted');
 
+    // 6. Reset all user stats to zero (FIX FOR BUG)
+    await client.query(`
+      UPDATE user_stats 
+      SET 
+        total_parlays = 0,
+        total_wins = 0,
+        total_losses = 0,
+        pending_parlays = 0,
+        win_rate = 0.00,
+        current_streak = 0,
+        best_streak = 0,
+        leg_accuracy = 0.00
+    `);
+    console.log('✅ User stats reset to zero');
+
+    // 7. Reset all weekly opt-in status
+    await client.query(`
+      UPDATE users 
+      SET 
+        competition_opted_in = FALSE,
+        competition_opt_in_date = NULL,
+        competition_opt_out_date = NULL
+    `);
+    console.log('✅ Competition opt-in status reset');
+
     await client.query('COMMIT');
 
     console.log('🎉 FULL SYSTEM RESET COMPLETE');
 
     res.json({
       success: true,
-      message: 'Full system reset completed successfully',
+      message: 'Full system reset completed successfully - all data cleared',
       details: {
         parlaysDeleted: parlayResult.rowCount,
-        transactionsDeleted: txResult.rowCount
+        transactionsDeleted: txResult.rowCount,
+        statsReset: true,
+        optInsReset: true
       }
     });
 
