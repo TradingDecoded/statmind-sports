@@ -13,16 +13,21 @@ export default function LeaderboardPage() {
       setActiveTab('weekly');
     }
   }, []);
+  
   const [leaderboardData, setLeaderboardData] = useState([]);
   const [myRank, setMyRank] = useState(null);
-  const [stats, setStats] = useState(null);
+  const [stats, setStats] = useState({
+    total_users: 0,
+    total_parlays: 0,
+    avg_win_rate: 0,
+    best_streak_ever: 0
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const router = useRouter();
   const [competitionInfo, setCompetitionInfo] = useState(null);
 
   useEffect(() => {
-    fetchStats();
     fetchLeaderboard();
   }, [activeTab]); // Re-fetch when tab changes
 
@@ -47,7 +52,29 @@ export default function LeaderboardPage() {
       const data = await response.json();
 
       if (data.success) {
-        setLeaderboardData(data.leaderboard);
+        // Set leaderboard data
+        setLeaderboardData(data.leaderboard || []);
+
+        // ==========================================
+        // CRITICAL FIX: Handle summary stats from backend
+        // ==========================================
+        if (activeTab === 'overall' && data.summary) {
+          // For overall tab: use summary stats from backend
+          setStats({
+            total_users: data.summary.totalPlayers || 0,
+            total_parlays: data.summary.totalParlays || 0,
+            avg_win_rate: data.summary.avgWinRate || 0,
+            best_streak_ever: data.summary.bestStreak || 0
+          });
+        } else if (activeTab === 'weekly') {
+          // For weekly tab: fetch competition stats separately
+          await fetchCompetitionStats();
+        }
+
+        // Store my rank if available
+        if (data.my_rank) {
+          setMyRank(data.my_rank);
+        }
 
         // Store competition info if it exists
         if (activeTab === 'weekly' && data.competition) {
@@ -59,32 +86,37 @@ export default function LeaderboardPage() {
     } catch (err) {
       console.error('Leaderboard fetch error:', err);
       setError(err.message);
+      // Set empty stats on error
+      setStats({
+        total_users: 0,
+        total_parlays: 0,
+        avg_win_rate: 0,
+        best_streak_ever: 0
+      });
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchStats = async () => {
+  const fetchCompetitionStats = async () => {
     try {
       const token = localStorage.getItem('authToken');
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://statmindsports.com/api';
 
-      // Use different endpoint based on active tab
-      const endpoint = activeTab === 'weekly'
-        ? '/api/leaderboard/competition-stats'
-        : '/api/leaderboard/stats';
-
-      const response = await fetch(endpoint, {
-        headers: {
+      const response = await fetch(`${API_URL}/leaderboard/competition-stats`, {
+        headers: token ? {
           'Authorization': `Bearer ${token}`
-        }
+        } : {}
       });
 
       if (!response.ok) throw new Error('Failed to fetch stats');
 
       const data = await response.json();
-      setStats(data.stats);
+      if (data.success && data.stats) {
+        setStats(data.stats);
+      }
     } catch (err) {
-      console.error('Stats error:', err);
+      console.error('Competition stats error:', err);
     }
   };
 
@@ -114,29 +146,49 @@ export default function LeaderboardPage() {
           <p className="text-gray-400">Top Parlay Builders on StatMind Sports</p>
         </div>
 
-        {/* Platform Stats */}
-        {stats && (
-          <div className={`grid grid-cols-1 ${activeTab === 'weekly' ? 'md:grid-cols-3' : 'md:grid-cols-4'} gap-4 mb-8`}>
-            <div className="bg-gray-800 rounded-lg p-4 text-center">
-              <div className="text-3xl font-bold text-blue-400">{stats.total_users}</div>
-              <div className="text-sm text-gray-400">Total Players</div>
-            </div>
-            <div className="bg-gray-800 rounded-lg p-4 text-center">
-              <div className="text-3xl font-bold text-green-400">{stats.total_parlays}</div>
-              <div className="text-sm text-gray-400">Total Parlays</div>
-            </div>
-            <div className="bg-gray-800 rounded-lg p-4 text-center">
-              <div className="text-3xl font-bold text-yellow-400">{stats.avg_win_rate}%</div>
-              <div className="text-sm text-gray-400">Avg Win Rate</div>
-            </div>
-            {activeTab === 'overall' && (
-              <div className="bg-gray-800 rounded-lg p-4 text-center">
-                <div className="text-3xl font-bold text-orange-400">🔥 {stats.best_streak_ever}</div>
-                <div className="text-sm text-gray-400">Best Streak Ever</div>
-              </div>
-            )}
+        {/* Tab Switcher */}
+        <div className="flex justify-center gap-4 mb-8">
+          <button
+            onClick={() => setActiveTab('overall')}
+            className={`px-8 py-3 rounded-lg font-semibold transition-all ${activeTab === 'overall'
+              ? 'bg-blue-600 text-white shadow-lg'
+              : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+              }`}
+          >
+            🏆 Overall
+          </button>
+          <button
+            onClick={() => setActiveTab('weekly')}
+            className={`px-8 py-3 rounded-lg font-semibold transition-all ${activeTab === 'weekly'
+              ? 'bg-green-600 text-white shadow-lg'
+              : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+              }`}
+          >
+            📅 This Week
+          </button>
+        </div>
+
+        {/* Platform Stats - ALWAYS SHOW WITH ZEROS WHEN EMPTY */}
+        <div className={`grid grid-cols-1 ${activeTab === 'weekly' ? 'md:grid-cols-3' : 'md:grid-cols-4'} gap-4 mb-8`}>
+          <div className="bg-gray-800 rounded-lg p-4 text-center">
+            <div className="text-3xl font-bold text-blue-400">{stats.total_users || 0}</div>
+            <div className="text-sm text-gray-400">Total Players</div>
           </div>
-        )}
+          <div className="bg-gray-800 rounded-lg p-4 text-center">
+            <div className="text-3xl font-bold text-green-400">{stats.total_parlays || 0}</div>
+            <div className="text-sm text-gray-400">Total Parlays</div>
+          </div>
+          <div className="bg-gray-800 rounded-lg p-4 text-center">
+            <div className="text-3xl font-bold text-yellow-400">{parseFloat(stats.avg_win_rate || 0).toFixed(2)}%</div>
+            <div className="text-sm text-gray-400">Avg Win Rate</div>
+          </div>
+          {activeTab === 'overall' && (
+            <div className="bg-gray-800 rounded-lg p-4 text-center">
+              <div className="text-3xl font-bold text-orange-400">🔥 {stats.best_streak_ever || 0}</div>
+              <div className="text-sm text-gray-400">Best Streak Ever</div>
+            </div>
+          )}
+        </div>
 
         {/* My Rank Card */}
         {myRank && (
@@ -144,98 +196,64 @@ export default function LeaderboardPage() {
             <div className="text-lg mb-2">Your Current Rank</div>
             <div className="text-5xl font-bold">{getRankBadge(myRank)}</div>
             <div className="text-sm mt-2 text-gray-200">
-              {activeTab === 'overall' ? 'Overall Rankings' : 'This Week'}
+              {activeTab === 'overall' ? 'Overall Leaderboard' : 'This Week\'s Competition'}
             </div>
           </div>
         )}
 
-        {/* Tabs */}
-        <div className="flex justify-center mb-8 space-x-4">
-          <button
-            onClick={() => setActiveTab('overall')}
-            className={`px-6 py-3 rounded-lg font-semibold transition-all ${activeTab === 'overall'
-              ? 'bg-blue-600 text-white shadow-lg'
-              : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
-              }`}
-          >
-            🏆 Overall
-          </button>
-          <button
-            onClick={() => setActiveTab('weekly')}
-            className={`px-6 py-3 rounded-lg font-semibold transition-all ${activeTab === 'weekly'
-              ? 'bg-blue-600 text-white shadow-lg'
-              : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
-              }`}
-          >
-            📅 This Week
-          </button>
-        </div>
-
-        {/* Competition Prize Banner - Shows only on Weekly tab */}
-        {activeTab === 'weekly' && competitionInfo ? (
-          <div className="bg-gradient-to-r from-amber-600 to-orange-600 rounded-lg p-6 mb-6 shadow-xl">
-            <div className="flex items-center justify-between">
+        {/* Competition Info Banner (Weekly Tab Only) */}
+        {activeTab === 'weekly' && competitionInfo && (
+          <div className="bg-gradient-to-r from-green-600 to-emerald-600 rounded-lg p-6 mb-8">
+            <div className="flex justify-between items-center">
               <div>
-                <div className="text-2xl font-bold text-white mb-2">
-                  🏆 NFL Week {competitionInfo.nfl_week || competitionInfo.week_number} Competition
-                </div>
-                <div className="text-amber-100">
-                  Prize Pool: <span className="text-3xl font-bold text-white">${competitionInfo.prize_amount.toFixed(2)}</span>
-                  {competitionInfo.is_rollover && (
-                    <span className="ml-3 bg-yellow-400 text-gray-900 px-3 py-1 rounded-full text-sm font-bold">
-                      🎰 ROLLOVER!
-                    </span>
-                  )}
-                </div>
+                <h3 className="text-2xl font-bold mb-2">Week {competitionInfo.nfl_week} Competition</h3>
+                <p className="text-green-100">
+                  Prize Pool: <span className="font-bold text-yellow-300">${competitionInfo.prize_amount}</span>
+                  {competitionInfo.is_rollover && <span className="ml-2 text-xs bg-yellow-500 text-black px-2 py-1 rounded">ROLLOVER</span>}
+                </p>
               </div>
               <div className="text-right">
-                <div className="text-amber-100 text-sm">Competition Status</div>
-                <div className="text-white font-bold text-xl capitalize">{competitionInfo.status}</div>
+                <div className="text-sm text-green-100">Status</div>
+                <div className={`text-lg font-bold ${competitionInfo.status === 'active' ? 'text-yellow-300' : 'text-gray-300'
+                  }`}>
+                  {competitionInfo.status.toUpperCase()}
+                </div>
               </div>
             </div>
           </div>
-        ) : null}
-
-        {/* Competition Rules Link - Shows only on Weekly tab */}
-        {activeTab === 'weekly' ? (
-          <div className="text-center mb-6 mt-4">
-            <button
-              onClick={() => {
-                localStorage.removeItem('competition_rules_opted_out');
-                router.push('/competition/rules');
-              }}
-              className="text-amber-400 hover:text-amber-300 underline text-sm font-semibold transition-colors cursor-pointer"
-            >
-              📋 View Weekly Competition Rules & Prize Info
-            </button>
-          </div>
-        ) : null}
+        )}
 
         {/* Loading State */}
         {loading && (
           <div className="text-center py-20">
-            <div className="text-6xl mb-4">⏳</div>
-            <div className="text-xl text-gray-400">Loading leaderboard...</div>
+            <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+            <p className="text-gray-400 mt-4">Loading leaderboard...</p>
           </div>
         )}
 
         {/* Error State */}
-        {error && (
-          <div className="bg-red-900 text-white rounded-lg p-6 text-center">
-            <div className="text-2xl mb-2">❌</div>
-            <div>{error}</div>
+        {error && !loading && (
+          <div className="bg-red-900/50 border border-red-700 rounded-lg p-6 text-center">
+            <div className="text-red-400 text-lg mb-2">⚠️ Error Loading Leaderboard</div>
+            <p className="text-gray-300">{error}</p>
+            <button
+              onClick={fetchLeaderboard}
+              className="mt-4 px-6 py-2 bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
+            >
+              Try Again
+            </button>
           </div>
         )}
 
         {/* Leaderboard Table */}
         {!loading && !error && leaderboardData.length > 0 && (
-          <div className="bg-gray-800 rounded-lg overflow-hidden shadow-2xl">
+          <div className="bg-gray-800 rounded-lg overflow-hidden shadow-xl">
             <table className="w-full">
               <thead className="bg-gray-900">
                 <tr>
                   <th className="px-6 py-4 text-left text-sm font-semibold text-gray-400">Rank</th>
                   <th className="px-6 py-4 text-left text-sm font-semibold text-gray-400">Player</th>
-
+                  
                   {activeTab === 'overall' ? (
                     <>
                       <th className="px-6 py-4 text-center text-sm font-semibold text-gray-400">Parlays</th>
@@ -277,20 +295,19 @@ export default function LeaderboardPage() {
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
                           {user.avatar_url ? (
-                            <img src={user.avatar_url} alt="" className="w-10 h-10 rounded-full" />
+                            <img src={user.avatar_url} alt={user.username} className="w-10 h-10 rounded-full" />
                           ) : (
-                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold">
-                              {(user.display_name || user.username).charAt(0).toUpperCase()}
+                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+                              <span className="text-white font-bold">{user.username?.[0]?.toUpperCase() || 'U'}</span>
                             </div>
                           )}
                           <div>
-                            <div className="font-semibold text-white">{user.display_name || user.username}</div>
-                            <div className="text-sm text-gray-400">@{user.username}</div>
+                            <div className="text-white font-semibold">{user.display_name || user.username}</div>
+                            <div className="text-gray-400 text-sm">@{user.username}</div>
                           </div>
                         </div>
                       </td>
 
-                      {/* Different columns based on tab */}
                       {activeTab === 'overall' ? (
                         <>
                           {/* Parlays */}
@@ -300,21 +317,21 @@ export default function LeaderboardPage() {
 
                           {/* Win Rate */}
                           <td className="px-6 py-4 text-center">
-                            <span className={`font-bold ${parseFloat(user.win_rate) >= 60 ? 'text-green-400' :
+                            <span className={`text-lg font-bold ${parseFloat(user.win_rate) >= 70 ? 'text-green-400' :
                               parseFloat(user.win_rate) >= 50 ? 'text-yellow-400' :
                                 'text-red-400'
                               }`}>
-                              {parseFloat(user.win_rate).toFixed(1)}%
+                              {parseFloat(user.win_rate || 0).toFixed(1)}%
                             </span>
                           </td>
 
                           {/* Record */}
                           <td className="px-6 py-4 text-center">
-                            <div className="text-sm">
+                            <span className="text-gray-300">
                               <span className="text-green-400">{user.total_wins || 0}W</span>
-                              <span className="text-gray-500"> - </span>
+                              {' - '}
                               <span className="text-red-400">{user.total_losses || 0}L</span>
-                            </div>
+                            </span>
                           </td>
 
                           {/* Streak */}
@@ -377,21 +394,17 @@ export default function LeaderboardPage() {
             <div className="text-xl text-gray-400 mb-4">
               No rankings yet for {activeTab === 'overall' ? 'overall' : 'this week'}
             </div>
-            <p className="text-gray-500">
+            <p className="text-gray-500 mb-6">
               Create at least 3 parlays to appear on the leaderboard!
             </p>
+            <button
+              onClick={() => router.push('/parlay-builder')}
+              className="px-8 py-3 bg-blue-600 hover:bg-blue-700 rounded-lg font-semibold transition-colors"
+            >
+              Create Parlay
+            </button>
           </div>
         )}
-
-        {/* Back Button */}
-        <div className="mt-8 text-center">
-          <button
-            onClick={() => router.push('/parlay-builder')}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-lg font-semibold transition-all"
-          >
-            Create Parlay
-          </button>
-        </div>
       </div>
     </div>
   );

@@ -15,7 +15,27 @@ class LeaderboardService {
     try {
       const offset = (page - 1) * limit;
 
-      // Get ranked users with minimum parlay requirement
+      // ==========================================
+      // QUERY 1: GET SUMMARY STATS (TOP CARDS)
+      // Aggregate stats for all premium/VIP users with 3+ parlays
+      // ==========================================
+      const summaryResult = await pool.query(
+        `SELECT 
+          COUNT(DISTINCT u.id) as total_players,
+          COALESCE(SUM(s.total_parlays), 0) as total_parlays,
+          COALESCE(AVG(s.win_rate), 0) as avg_win_rate,
+          COALESCE(MAX(s.best_streak), 0) as best_streak
+         FROM users u
+         INNER JOIN user_stats s ON u.id = s.user_id
+         WHERE s.total_parlays >= 3
+           AND u.is_active = true
+           AND u.membership_tier IN ('premium', 'vip')`
+      );
+
+      // ==========================================
+      // QUERY 2: GET RANKED USERS (LEADERBOARD TABLE)
+      // Only premium/VIP users with 3+ parlays
+      // ==========================================
       const result = await pool.query(
         `SELECT 
           u.id,
@@ -41,7 +61,9 @@ class LeaderboardService {
         [limit, offset]
       );
 
-      // Get total count
+      // ==========================================
+      // QUERY 3: GET TOTAL COUNT (FOR PAGINATION)
+      // ==========================================
       const countResult = await pool.query(
         `SELECT COUNT(*) as total
          FROM users u
@@ -51,7 +73,16 @@ class LeaderboardService {
            AND u.membership_tier IN ('premium', 'vip')`
       );
 
+      // ==========================================
+      // RETURN ALL DATA INCLUDING SUMMARY
+      // ==========================================
       return {
+        summary: {
+          totalPlayers: parseInt(summaryResult.rows[0].total_players) || 0,
+          totalParlays: parseInt(summaryResult.rows[0].total_parlays) || 0,
+          avgWinRate: parseFloat(summaryResult.rows[0].avg_win_rate) || 0,
+          bestStreak: parseInt(summaryResult.rows[0].best_streak) || 0
+        },
         leaderboard: result.rows,
         total: parseInt(countResult.rows[0].total),
         page,
