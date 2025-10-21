@@ -62,7 +62,7 @@ class LeaderboardService {
   }
   
   // ==========================================
-  // GET WEEKLY LEADERBOARD
+  // GET WEEKLY LEADERBOARD (OLD METHOD - KEPT FOR COMPATIBILITY)
   // Top users for parlays created this week
   // ==========================================
   async getWeeklyLeaderboard(limit = 100) {
@@ -124,6 +124,74 @@ class LeaderboardService {
       throw error;
     }
   }
+
+  // ==========================================
+  // GET COMPETITION LEADERBOARD (NEW FOR PHASE 4)
+  // Current week's competition standings with points
+  // ==========================================
+  async getCompetitionLeaderboard(limit = 100) {
+    try {
+      // Get current active competition
+      const compResult = await pool.query(
+        `SELECT * FROM weekly_competitions 
+         WHERE status = 'active' 
+         ORDER BY created_at DESC 
+         LIMIT 1`
+      );
+
+      if (compResult.rows.length === 0) {
+        return {
+          leaderboard: [],
+          competition: null,
+          total: 0
+        };
+      }
+
+      const competition = compResult.rows[0];
+
+      // Get standings from weekly_competition_standings
+      const result = await pool.query(
+        `SELECT 
+          wcs.rank,
+          wcs.total_points,
+          wcs.parlays_entered,
+          wcs.parlays_won,
+          u.id,
+          u.username,
+          u.display_name,
+          u.avatar_url,
+          u.membership_tier,
+          s.current_streak
+         FROM weekly_competition_standings wcs
+         INNER JOIN users u ON wcs.user_id = u.id
+         INNER JOIN user_stats s ON u.id = s.user_id
+         WHERE wcs.competition_id = $1
+           AND u.is_active = true
+         ORDER BY wcs.rank ASC
+         LIMIT $2`,
+        [competition.id, limit]
+      );
+
+      return {
+        leaderboard: result.rows,
+        competition: {
+          id: competition.id,
+          week_number: competition.week_number,
+          year: competition.year,
+          prize_amount: parseFloat(competition.prize_amount),
+          is_rollover: competition.is_rollover,
+          start_datetime: competition.start_datetime,
+          end_datetime: competition.end_datetime,
+          status: competition.status
+        },
+        total: result.rows.length
+      };
+      
+    } catch (error) {
+      console.error('Error fetching competition leaderboard:', error);
+      throw error;
+    }
+  }
   
   // ==========================================
   // GET USER'S RANK
@@ -146,40 +214,26 @@ class LeaderboardService {
         [userId]
       );
       
-      // Weekly rank
-      const now = new Date();
-      const dayOfWeek = now.getDay();
-      const startOfWeek = new Date(now);
-      startOfWeek.setDate(now.getDate() - dayOfWeek);
-      startOfWeek.setHours(0, 0, 0, 0);
-      
-      const weeklyResult = await pool.query(
-        `WITH weekly_stats AS (
-          SELECT 
-            user_id,
-            COUNT(*) as weekly_parlays,
-            CASE 
-              WHEN COUNT(CASE WHEN is_hit IS NOT NULL THEN 1 END) > 0 
-              THEN ROUND((SUM(CASE WHEN is_hit = true THEN 1 ELSE 0 END)::DECIMAL / 
-                         COUNT(CASE WHEN is_hit IS NOT NULL THEN 1 END)) * 100, 2)
-              ELSE 0 
-            END as weekly_win_rate
-          FROM user_parlays
-          WHERE created_at >= $1
-          GROUP BY user_id
-        ),
-        ranked_users AS (
-          SELECT 
-            ws.user_id,
-            ROW_NUMBER() OVER (ORDER BY ws.weekly_win_rate DESC, ws.weekly_parlays DESC) as rank
-          FROM weekly_stats ws
-          INNER JOIN users u ON u.id = ws.user_id
-          WHERE ws.weekly_parlays >= 1
-            AND u.is_active = true
-        )
-        SELECT rank FROM ranked_users WHERE user_id = $2`,
-        [startOfWeek, userId]
+      // Competition rank
+      const compResult = await pool.query(
+        `SELECT wc.id 
+         FROM weekly_competitions wc 
+         WHERE wc.status = 'active' 
+         ORDER BY wc.created_at DESC 
+         LIMIT 1`
       );
+
+      let competitionRank = null;
+      if (compResult.rows.length > 0) {
+        const competitionId = compResult.rows[0].id;
+        const compRankResult = await pool.query(
+          `SELECT rank 
+           FROM weekly_competition_standings 
+           WHERE competition_id = $1 AND user_id = $2`,
+          [competitionId, userId]
+        );
+        competitionRank = compRankResult.rows[0]?.rank || null;
+      }
       
       // Get total user counts
       const totalOverall = await pool.query(
@@ -190,23 +244,25 @@ class LeaderboardService {
            AND u.is_active = true`
       );
       
-      const totalWeekly = await pool.query(
-        `SELECT COUNT(DISTINCT user_id) as total
-         FROM user_parlays
-         WHERE created_at >= $1`,
-        [startOfWeek]
-      );
+      const totalCompetition = compResult.rows.length > 0 
+        ? await pool.query(
+            `SELECT COUNT(*) as total
+             FROM weekly_competition_standings
+             WHERE competition_id = $1`,
+            [compResult.rows[0].id]
+          )
+        : { rows: [{ total: 0 }] };
       
       return {
         overall_rank: overallResult.rows[0]?.rank || null,
-        weekly_rank: weeklyResult.rows[0]?.rank || null,
+        competition_rank: competitionRank,
         total_overall: parseInt(totalOverall.rows[0].total),
-        total_weekly: parseInt(totalWeekly.rows[0].total),
+        total_competition: parseInt(totalCompetition.rows[0].total),
         percentile_overall: overallResult.rows[0]?.rank 
           ? Math.round((1 - (overallResult.rows[0].rank / parseInt(totalOverall.rows[0].total))) * 100)
           : null,
-        percentile_weekly: weeklyResult.rows[0]?.rank
-          ? Math.round((1 - (weeklyResult.rows[0].rank / parseInt(totalWeekly.rows[0].total))) * 100)
+        percentile_competition: competitionRank && parseInt(totalCompetition.rows[0].total) > 0
+          ? Math.round((1 - (competitionRank / parseInt(totalCompetition.rows[0].total))) * 100)
           : null
       };
       

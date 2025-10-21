@@ -44,7 +44,7 @@ router.get('/overall', optionalAuth, async (req, res) => {
 
 // ==========================================
 // GET /api/leaderboard/weekly
-// Get weekly leaderboard
+// Get weekly leaderboard (LEGACY - calendar week stats)
 // ==========================================
 router.get('/weekly', optionalAuth, async (req, res) => {
   try {
@@ -70,6 +70,38 @@ router.get('/weekly', optionalAuth, async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Failed to fetch weekly leaderboard'
+    });
+  }
+});
+
+// ==========================================
+// GET /api/leaderboard/competition
+// Get current competition leaderboard with points
+// ==========================================
+router.get('/competition', optionalAuth, async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 100;
+    
+    const data = await leaderboardService.getCompetitionLeaderboard(limit);
+    
+    // If user is logged in, get their rank too
+    let myRank = null;
+    if (req.user && data.competition) {
+      const rankData = await leaderboardService.getUserRank(req.user.id);
+      myRank = rankData.competition_rank;
+    }
+    
+    res.json({
+      success: true,
+      ...data,
+      my_rank: myRank
+    });
+    
+  } catch (error) {
+    console.error('Get competition leaderboard error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch competition leaderboard'
     });
   }
 });
