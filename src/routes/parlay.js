@@ -449,6 +449,32 @@ router.delete('/:id', requireAuth, async (req, res) => {
 });
 
 // ==========================================
+// POST /api/parlay/:id/upgrade
+// Upgrade a practice parlay to competition entry
+// ==========================================
+router.post('/:id/upgrade', requireAuth, async (req, res) => {
+  try {
+    const parlayId = parseInt(req.params.id);
+    const userId = req.user.id;
+
+    console.log(`\n🔄 Upgrade request received:`);
+    console.log(`   - Parlay ID: ${parlayId}`);
+    console.log(`   - User ID: ${userId}`);
+
+    const result = await parlayService.upgradePracticeParlayToCompetition(parlayId, userId);
+
+    res.json(result);
+
+  } catch (error) {
+    console.error('Upgrade parlay route error:', error);
+    res.status(400).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// ==========================================
 // HELPER FUNCTIONS
 // ==========================================
 function getWeekNumber(date) {

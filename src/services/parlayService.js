@@ -610,6 +610,207 @@ class ParlayService {
       client.release();
     }
   }
+
+  // ==========================================
+  // UPGRADE PRACTICE PARLAY TO COMPETITION
+  // Converts a free practice parlay to paid competition entry
+  // ==========================================
+  async upgradePracticeParlayToCompetition(parlayId, userId) {
+    const client = await pool.connect();
+
+    try {
+      await client.query('BEGIN');
+
+      console.log(`\n🔄 Attempting to upgrade parlay ${parlayId} for user ${userId}...`);
+
+      // 1. Get the parlay and verify ownership
+      const parlayResult = await client.query(
+        `SELECT * FROM user_parlays 
+         WHERE id = $1 AND user_id = $2`,
+        [parlayId, userId]
+      );
+
+      if (parlayResult.rows.length === 0) {
+        await client.query('ROLLBACK');
+        throw new Error('Parlay not found or does not belong to you');
+      }
+
+      const parlay = parlayResult.rows[0];
+
+      // 2. Check if it's a practice parlay
+      if (parlay.is_practice_parlay === false) {
+        await client.query('ROLLBACK');
+        throw new Error('This parlay is already a competition entry');
+      }
+
+      // 3. Check if parlay is already resolved
+      if (parlay.is_hit !== null) {
+        await client.query('ROLLBACK');
+        throw new Error('Cannot upgrade a resolved parlay');
+      }
+
+      // 4. Check if parlay is locked (first game has started)
+      const games = parlay.games;
+      const gameIds = games.map(g => g.game_id);
+
+      // Fetch actual game dates from database
+      const gamesDataResult = await client.query(
+        'SELECT id, game_date FROM games WHERE id = ANY($1::int[])',
+        [gameIds]
+      );
+
+      if (gamesDataResult.rows.length === 0) {
+        await client.query('ROLLBACK');
+        throw new Error('Game data not found');
+      }
+
+      // Find the earliest game
+      const firstGame = gamesDataResult.rows.reduce((earliest, game) => {
+        return new Date(game.game_date) < new Date(earliest.game_date) ? game : earliest;
+      }, gamesDataResult.rows[0]);
+
+      const firstGameStart = new Date(firstGame.game_date);
+      const now = new Date();
+
+      if (now >= firstGameStart) {
+        await client.query('ROLLBACK');
+        throw new Error('Cannot upgrade: parlay is locked (first game has started)');
+      }
+
+      console.log(`✅ Parlay is unlocked. First game starts: ${firstGameStart.toISOString()}`);
+
+      // 5. Get user's account info
+      const userResult = await client.query(
+        'SELECT account_tier, sms_bucks, competition_opted_in FROM users WHERE id = $1',
+        [userId]
+      );
+
+      if (userResult.rows.length === 0) {
+        await client.query('ROLLBACK');
+        throw new Error('User not found');
+      }
+
+      const { account_tier, sms_bucks, competition_opted_in } = userResult.rows[0];
+
+      // 6. Verify user is Premium/VIP
+      if (account_tier === 'free') {
+        await client.query('ROLLBACK');
+        throw new Error('Must be Premium or VIP to enter competitions');
+      }
+
+      // 7. Check competition status
+      const competitionStatus = await competitionService.getUserCompetitionStatus(userId);
+
+      if (!competitionStatus.isCompetitionWindowOpen) {
+        await client.query('ROLLBACK');
+        throw new Error('Competition window is closed. Cannot upgrade parlay.');
+      }
+
+      // 8. Check if user has enough SMS Bucks
+      const upgradeCost = 100;
+      if (sms_bucks < upgradeCost) {
+        await client.query('ROLLBACK');
+        throw new Error(`Insufficient SMS Bucks. Need ${upgradeCost}, have ${sms_bucks}`);
+      }
+
+      console.log(`💰 User has ${sms_bucks} SMS Bucks. Upgrade cost: ${upgradeCost}`);
+
+      // 9. Get current competition ID
+      const competitionResult = await client.query(
+        'SELECT id FROM weekly_competitions WHERE year = $1 AND week_number = $2',
+        [parlay.year, parlay.week_number]
+      );
+
+      const competitionId = competitionResult.rows.length > 0
+        ? competitionResult.rows[0].id
+        : null;
+
+      if (!competitionId) {
+        await client.query('ROLLBACK');
+        throw new Error('No active competition found for this week');
+      }
+
+      // 10. If user is not opted in, opt them in automatically
+      if (!competition_opted_in) {
+        console.log(`🎯 User not opted in. Auto-opting in during upgrade...`);
+        await client.query(
+          `UPDATE users 
+           SET competition_opted_in = TRUE,
+               competition_opt_in_date = NOW()
+           WHERE id = $1`,
+          [userId]
+        );
+      }
+
+      // 11. Update parlay: set is_practice_parlay = FALSE, add competition_id, update cost
+      await client.query(
+        `UPDATE user_parlays 
+         SET is_practice_parlay = FALSE,
+             competition_id = $1,
+             sms_bucks_cost = $2
+         WHERE id = $3`,
+        [competitionId, upgradeCost, parlayId]
+      );
+
+      console.log(`✅ Parlay ${parlayId} upgraded to competition entry`);
+
+      // 12. Deduct SMS Bucks
+      const newBalance = sms_bucks - upgradeCost;
+      await client.query(
+        'UPDATE users SET sms_bucks = $1 WHERE id = $2',
+        [newBalance, userId]
+      );
+
+      console.log(`💸 Deducted ${upgradeCost} SMS Bucks. New balance: ${newBalance}`);
+
+      // 13. Record SMS Bucks transaction
+      await client.query(
+        `INSERT INTO sms_bucks_transactions 
+         (user_id, amount, transaction_type, balance_after, description, related_parlay_id)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [userId, -upgradeCost, 'parlay_upgrade', newBalance,
+          `Upgraded practice parlay to competition: ${parlay.parlay_name}`, parlayId]
+      );
+
+      // 14. Update weekly parlay count (now counts as competition entry)
+      await client.query(
+        `INSERT INTO weekly_parlay_counts (user_id, year, week_number, parlay_count, last_parlay_date)
+         VALUES ($1, $2, $3, 1, NOW())
+         ON CONFLICT (user_id, year, week_number) 
+         DO UPDATE SET parlay_count = weekly_parlay_counts.parlay_count + 1, 
+                       last_parlay_date = NOW()`,
+        [userId, parlay.year, parlay.week_number]
+      );
+
+      await client.query('COMMIT');
+
+      console.log(`\n🎉 UPGRADE SUCCESSFUL!`);
+      console.log(`   - Parlay ID: ${parlayId}`);
+      console.log(`   - Cost: ${upgradeCost} SMS Bucks`);
+      console.log(`   - New Balance: ${newBalance}`);
+      console.log(`   - Competition ID: ${competitionId}`);
+
+      return {
+        success: true,
+        message: 'Parlay upgraded to competition entry!',
+        parlay: {
+          id: parlayId,
+          is_practice_parlay: false,
+          competition_id: competitionId,
+          sms_bucks_cost: upgradeCost
+        },
+        newBalance,
+        amountCharged: upgradeCost
+      };
+
+    } catch (error) {
+      await client.query('ROLLBACK');
+      console.error('❌ Upgrade parlay error:', error);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
 }
 
 export default new ParlayService();
