@@ -467,7 +467,7 @@ export default function LeaderboardPage() {
               No rankings yet for {activeTab === 'overall' ? 'overall' : 'this week'}
             </div>
             <p className="text-gray-500 mb-6">
-              Create at least 3 parlays to appear on the leaderboard!
+              Create at least 1 parlay to appear on the leaderboard!
             </p>
             <button
               onClick={() => router.push('/parlay-builder')}

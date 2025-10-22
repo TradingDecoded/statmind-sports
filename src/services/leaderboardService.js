@@ -27,7 +27,7 @@ class LeaderboardService {
           COALESCE(MAX(s.best_streak), 0) as best_streak
          FROM users u
          INNER JOIN user_stats s ON u.id = s.user_id
-         WHERE s.total_parlays >= 3
+         WHERE s.total_parlays >= 1
            AND u.is_active = true`
       );
 
@@ -52,7 +52,7 @@ class LeaderboardService {
           ROW_NUMBER() OVER (ORDER BY s.win_rate DESC, s.total_parlays DESC) as rank
          FROM users u
          INNER JOIN user_stats s ON u.id = s.user_id
-         WHERE s.total_parlays >= 3
+         WHERE s.total_parlays >= 1
            AND u.is_active = true
          ORDER BY s.win_rate DESC, s.total_parlays DESC
          LIMIT $1 OFFSET $2`,
@@ -66,7 +66,7 @@ class LeaderboardService {
         `SELECT COUNT(*) as total
          FROM users u
          INNER JOIN user_stats s ON u.id = s.user_id
-         WHERE s.total_parlays >= 3
+         WHERE s.total_parlays >= 1
            AND u.is_active = true`
       );
 
@@ -240,7 +240,7 @@ class LeaderboardService {
             ROW_NUMBER() OVER (ORDER BY s.win_rate DESC, s.total_parlays DESC) as rank
           FROM users u
           INNER JOIN user_stats s ON u.id = s.user_id
-          WHERE s.total_parlays >= 3
+          WHERE s.total_parlays >= 1
             AND u.is_active = true
         )
         SELECT rank FROM ranked_users WHERE id = $1`,
@@ -273,7 +273,7 @@ class LeaderboardService {
         `SELECT COUNT(*) as total
          FROM users u
          INNER JOIN user_stats s ON u.id = s.user_id
-         WHERE s.total_parlays >= 3
+         WHERE s.total_parlays >= 1
            AND u.is_active = true`
       );
 
@@ -321,7 +321,7 @@ class LeaderboardService {
          FROM users u
          INNER JOIN user_stats s ON u.id = s.user_id
          WHERE u.is_active = true
-           AND s.total_parlays >= 3`
+           AND s.total_parlays >= 1`
       );
 
       return result.rows[0];
