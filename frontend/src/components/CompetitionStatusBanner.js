@@ -56,9 +56,29 @@ export default function CompetitionStatusBanner({ status }) {
   };
 
   const getStatusConfig = () => {
-    const { statusType, parlayCount, maxParlays, competition } = status;
+    const { statusType, parlayCount, maxParlays, competition, accountTier } = status;
     const prizeAmount = competition?.prizeAmount || 50;
 
+    // 🚨 SECURITY: Block free users FIRST - regardless of opt-in status
+    if (accountTier === 'free') {
+      const potentialPoints = parlayCount * 6;
+      return {
+        bgColor: 'bg-gradient-to-br from-purple-900/50 via-blue-900/50 to-indigo-900/50',
+        borderColor: 'border-purple-500/60',
+        icon: '🎯',
+        title: 'Practice Mode',
+        count: `${parlayCount} Free ${parlayCount === 1 ? 'Parlay' : 'Parlays'}`,
+        message: `Build unlimited free parlays • Upgrade to compete for $${prizeAmount}`,
+        isFreeUser: true,
+        prizeAmount,
+        potentialPoints,
+        showButton: true,
+        buttonText: '🏆 Upgrade to Premium',
+        buttonAction: () => router.push('/upgrade'),
+      };
+    }
+
+    // Premium/VIP users - show competition status
     switch (statusType) {
       case 'max_reached':
         return {
@@ -100,42 +120,19 @@ export default function CompetitionStatusBanner({ status }) {
         };
 
       default:
-        const potentialPoints = parlayCount * 6;
-        
-        // Check if user is actually free tier
-        const isFreeUser = user?.membership_tier === 'free';
-        
-        if (isFreeUser) {
-          // Show upgrade CTA for free users
-          return {
-            bgColor: 'bg-gradient-to-br from-purple-900/50 via-blue-900/50 to-indigo-900/50',
-            borderColor: 'border-purple-500/60',
-            icon: '🎯',
-            title: 'Practice Mode',
-            count: `${parlayCount} Free ${parlayCount === 1 ? 'Parlay' : 'Parlays'}`,
-            isFreeUser: true,
-            prizeAmount,
-            potentialPoints,
-            showButton: true,
-            buttonText: '🏆 Upgrade to Premium',
-            buttonAction: () => router.push('/upgrade'),
-          };
-        } else {
-          // Premium/VIP user in practice mode (not opted in yet)
-          return {
-            bgColor: 'bg-gradient-to-r from-blue-900/40 to-indigo-900/40',
-            borderColor: 'border-blue-600/50',
-            icon: '🏈',
-            title: 'Build Your Parlay',
-            count: `${parlayCount} Parlay${parlayCount === 1 ? '' : 's'} Created`,
-            message: `Ready to compete for $${prizeAmount}?`,
-            showButton: true,
-            buttonText: 'Create Parlay →',
-            buttonAction: () => {}, // They're already on the page
-          };
-        }
+        // Premium/VIP user in practice mode (not opted in yet)
+        return {
+          bgColor: 'bg-gradient-to-r from-blue-900/40 to-indigo-900/40',
+          borderColor: 'border-blue-600/50',
+          icon: '🏈',
+          title: 'Build Your Parlay',
+          count: `${parlayCount} Parlay${parlayCount === 1 ? '' : 's'} Created`,
+          message: `Ready to compete for $${prizeAmount}?`,
+          showButton: true,
+          buttonText: 'Create Parlay →',
+          buttonAction: () => { }, // They're already on the page
+        };
     }
-    
   };
 
   const config = getStatusConfig();

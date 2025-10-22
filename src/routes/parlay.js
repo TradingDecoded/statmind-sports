@@ -143,6 +143,36 @@ router.post('/create',
       const userId = req.user.id;
       const parlayData = req.body;
 
+      // 🚨 SECURITY: Verify user's CURRENT tier before allowing competition parlays
+      const tierCheck = await pool.query(
+        'SELECT membership_tier, competition_opted_in FROM users WHERE id = $1',
+        [userId]
+      );
+
+      if (tierCheck.rows.length === 0) {
+        return res.status(404).json({
+          success: false,
+          error: 'User not found'
+        });
+      }
+
+      const userTier = tierCheck.rows[0].membership_tier;
+      const isOptedIn = tierCheck.rows[0].competition_opted_in;
+
+      // Block free users from creating competition parlays
+      if (userTier === 'free' && parlayData.isPracticeFreeParlay === false) {
+        return res.status(403).json({
+          success: false,
+          error: 'Competition access requires active Premium or VIP membership',
+          requiresUpgrade: true
+        });
+      }
+
+      // Force free parlays for free tier users (override any client-side setting)
+      if (userTier === 'free') {
+        parlayData.isPracticeFreeParlay = true;
+      }
+
       const result = await parlayService.createParlay(userId, parlayData);
 
       res.status(201).json(result);

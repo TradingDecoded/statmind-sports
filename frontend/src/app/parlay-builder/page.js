@@ -308,10 +308,7 @@ export default function ParlayBuilderPage() {
           {competitionStatus && (
             <div className="flex-shrink-0 w-[700px]">
               <CompetitionStatusBanner
-                status={{
-                  ...competitionStatus,
-                  parlayCount: userParlays.length
-                }}
+                status={competitionStatus}
               />
             </div>
           )}

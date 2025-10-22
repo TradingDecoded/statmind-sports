@@ -577,25 +577,15 @@ router.post('/members/:userId/change-tier', async (req, res) => {
       [tier, userId]
     );
 
-    // If upgrading to premium or vip, set subscription dates
-    if (tier === 'premium' || tier === 'vip') {
-      const now = new Date();
-      const endDate = new Date(now);
-      endDate.setMonth(endDate.getMonth() + 1);
-
-      await client.query(
-        `UPDATE users 
-         SET subscription_start_date = $1, subscription_end_date = $2 
-         WHERE id = $3`,
-        [now, endDate, userId]
-      );
-    }
-
-    // If downgrading to free, clear subscription dates
+    // If downgrading to free, clear subscription dates AND competition opt-in
     if (tier === 'free') {
       await client.query(
         `UPDATE users 
-         SET subscription_start_date = NULL, subscription_end_date = NULL 
+         SET subscription_start_date = NULL, 
+             subscription_end_date = NULL,
+             competition_opted_in = FALSE,
+             competition_opt_in_date = NULL,
+             competition_opt_out_date = NULL
          WHERE id = $1`,
         [userId]
       );
@@ -702,6 +692,17 @@ router.post('/members/:userId/cancel-membership', async (req, res) => {
        SET membership_tier = 'free',
            subscription_start_date = NULL,
            subscription_end_date = NULL
+       WHERE id = $1`,
+      [userId]
+    );
+
+    // 🚨 SECURITY: Clear competition opt-in when downgrading to free
+    await client.query(
+      `UPDATE users 
+       SET 
+         competition_opted_in = FALSE,
+         competition_opt_in_date = NULL,
+         competition_opt_out_date = NULL
        WHERE id = $1`,
       [userId]
     );

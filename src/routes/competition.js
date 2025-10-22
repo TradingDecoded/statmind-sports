@@ -88,10 +88,51 @@ router.get('/status', requireAuth, async (req, res) => {
   try {
     const userId = req.user.id;
 
+    // 🚨 SECURITY: Check user's current tier FIRST
+    const userResult = await pool.query(
+      'SELECT membership_tier FROM users WHERE id = $1',
+      [userId]
+    );
+
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found'
+      });
+    }
+
+    const userTier = userResult.rows[0].membership_tier;
+
+    // Free users NEVER get competition status, regardless of opt-in
+    if (userTier === 'free') {
+      const competition = await competitionService.getCurrentCompetition();
+
+      return res.json({
+        success: true,
+        status: {
+          accountTier: 'free',
+          isOptedIn: false,  // Always false for free users
+          isCompetitionWindowOpen: false,
+          shouldCreateFreeParlays: true,
+          canOptIn: false,
+          isEligible: false,  // NEW: Explicit eligibility flag
+          parlayCount: 0,
+          competitionId: competition ? competition.id : null,
+          statusType: 'default',
+          maxParlays: 20,
+          minToQualify: 1,
+          competition: competition ? {
+            prizeAmount: parseFloat(competition.prize_amount),
+            isRollover: competition.is_rollover
+          } : null
+        }
+      });
+    }
+
     // Get comprehensive status
     const status = await competitionService.getUserCompetitionStatus(userId);
 
-    // Get user's parlay count for this week
+    // Get user's COMPETITION parlay count for this week (exclude practice)
     const competition = await competitionService.getCurrentCompetition();
     let parlayCount = 0;
 
@@ -101,7 +142,7 @@ router.get('/status', requireAuth, async (req, res) => {
          FROM user_parlays 
          WHERE user_id = $1 
          AND competition_id = $2
-         AND is_practice_parlay = FALSE`,
+         AND (is_practice_parlay = FALSE OR is_practice_parlay IS NULL)`,
         [userId, competition.id]
       );
       parlayCount = parseInt(parlayResult.rows[0].count);
