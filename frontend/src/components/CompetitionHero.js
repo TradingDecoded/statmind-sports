@@ -12,60 +12,52 @@ export default function CompetitionHero() {
 
   useEffect(() => {
     fetchCompetition();
-    const interval = setInterval(updateTimeRemaining, 1000);
-    return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    if (!competition) return;
+
+    const updateTime = () => {
+      const now = new Date();
+      const end = new Date(competition.end_datetime);
+      const diff = end - now;
+
+      if (diff <= 0) {
+        setTimeRemaining('Ended');
+        return;
+      }
+
+      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+
+      if (days > 0) {
+        setTimeRemaining(`${days}d ${hours}h left`);
+      } else if (hours > 0) {
+        setTimeRemaining(`${hours}h left`);
+      } else {
+        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+        setTimeRemaining(`${minutes}m left`);
+      }
+    };
+
+    updateTime();
+    const interval = setInterval(updateTime, 60000);
+    return () => clearInterval(interval);
+  }, [competition]);
 
   const fetchCompetition = async () => {
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://statmindsports.com/api';
       const response = await fetch(`${apiUrl}/competition/current`);
+      const data = await response.json();
 
-      // Handle both success and 404 (no competition) gracefully
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success && data.competition) {
-          setCompetition(data.competition);
-        } else {
-          setCompetition(null);
-        }
-      } else if (response.status === 404) {
-        // No active competition - this is okay
-        console.log('ℹ️ No active competition found');
-        setCompetition(null);
-      } else {
-        throw new Error('Failed to fetch competition');
+      if (data.success) {
+        setCompetition(data.competition);
       }
     } catch (error) {
       console.error('Error fetching competition:', error);
-      setCompetition(null);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const updateTimeRemaining = () => {
-    if (!competition) return;
-
-    const now = new Date();
-    const end = new Date(competition.end_date);
-    const diff = end - now;
-
-    if (diff <= 0) {
-      setTimeRemaining('Ended');
-      return;
-    }
-
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-
-    if (days > 0) {
-      setTimeRemaining(`${days}d ${hours}h left`);
-    } else if (hours > 0) {
-      setTimeRemaining(`${hours}h left`);
-    } else {
-      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-      setTimeRemaining(`${minutes}m left`);
     }
   };
 
@@ -75,7 +67,8 @@ export default function CompetitionHero() {
     } else if (user.membership_tier === 'free') {
       router.push('/upgrade');
     } else {
-      router.push('/competition/rules');
+      // Premium/VIP users - go straight to parlay builder with toggle
+      router.push('/parlay-builder');
     }
   };
 
@@ -130,7 +123,7 @@ export default function CompetitionHero() {
               onClick={handleClick}
               className="bg-white text-amber-600 px-6 py-2 rounded-lg font-bold text-sm hover:bg-amber-50 transition-all shadow-lg hover:scale-105 whitespace-nowrap"
             >
-              {!user ? 'Join Now' : isPremium ? 'Enter Competition' : 'Upgrade to Enter'}
+              {!user ? 'Join Now' : isPremium ? 'Build Parlay' : 'Upgrade to Enter'}
             </button>
           </div>
         </div>

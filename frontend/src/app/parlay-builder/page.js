@@ -25,6 +25,7 @@ export default function ParlayBuilderPage() {
   const [competitionStatus, setCompetitionStatus] = useState(null);
   const [userParlays, setUserParlays] = useState([]);
   const [isPracticeMode, setIsPracticeMode] = useState(true);
+  const [upgradingParlay, setUpgradingParlay] = useState(null);
 
   useEffect(() => {
     // Don't redirect while still checking auth
@@ -103,6 +104,43 @@ export default function ParlayBuilderPage() {
       }
     } catch (error) {
       console.error('Error fetching user parlays:', error);
+    }
+  };
+
+  const handleUpgradeParlay = async (parlayId, parlayName) => {
+    const confirmed = window.confirm(
+      `Upgrade "${parlayName}" to competition entry for 100 SMS Bucks?`
+    );
+
+    if (!confirmed) return;
+
+    setUpgradingParlay(parlayId);
+
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`/api/parlay/${parlayId}/upgrade`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to upgrade parlay');
+      }
+
+      alert(`✅ Parlay upgraded! New balance: ${data.newBalance} SMS Bucks`);
+
+      // Reload page to refresh
+      window.location.reload();
+
+    } catch (err) {
+      alert(`❌ ${err.message}`);
+      console.error('Upgrade error:', err);
+      setUpgradingParlay(null);
     }
   };
 
@@ -570,8 +608,8 @@ export default function ParlayBuilderPage() {
                         type="button"
                         onClick={() => setIsPracticeMode(true)}
                         className={`w-full py-4 px-4 rounded-lg font-semibold text-sm transition-all ${isPracticeMode
-                            ? 'bg-blue-600 text-white border-2 border-blue-400 shadow-lg'
-                            : 'bg-slate-700 text-slate-300 border-2 border-slate-600 hover:border-slate-500'
+                          ? 'bg-blue-600 text-white border-2 border-blue-400 shadow-lg'
+                          : 'bg-slate-700 text-slate-300 border-2 border-slate-600 hover:border-slate-500'
                           }`}
                       >
                         <div className="flex items-center justify-center gap-3">
@@ -589,10 +627,10 @@ export default function ParlayBuilderPage() {
                         onClick={() => setIsPracticeMode(false)}
                         disabled={user?.membership_tier === 'free'}
                         className={`w-full py-4 px-4 rounded-lg font-semibold text-sm transition-all ${!isPracticeMode
-                            ? 'bg-emerald-600 text-white border-2 border-emerald-400 shadow-lg'
-                            : user?.membership_tier === 'free'
-                              ? 'bg-slate-800 text-slate-500 border-2 border-slate-700 cursor-not-allowed'
-                              : 'bg-slate-700 text-slate-300 border-2 border-slate-600 hover:border-slate-500'
+                          ? 'bg-emerald-600 text-white border-2 border-emerald-400 shadow-lg'
+                          : user?.membership_tier === 'free'
+                            ? 'bg-slate-800 text-slate-500 border-2 border-slate-700 cursor-not-allowed'
+                            : 'bg-slate-700 text-slate-300 border-2 border-slate-600 hover:border-slate-500'
                           }`}
                       >
                         <div className="flex items-center justify-center gap-3">
@@ -679,21 +717,49 @@ export default function ParlayBuilderPage() {
                         </span>
                       </div>
 
-                      {/* Practice/Competition Badge */}
-                      <div className="flex items-center gap-2 mt-2">
+                      {/* Practice/Competition Badge with Upgrade Button */}
+                      <div className="mt-2">
                         {parlay.is_practice_parlay ? (
-                          <span className="text-xs bg-blue-900/30 text-blue-400 px-2 py-0.5 rounded">
-                            🎯 Practice
-                          </span>
-                        ) : (
-                          <span className="text-xs bg-amber-900/30 text-amber-400 px-2 py-0.5 rounded">
-                            🏆 Competition
-                          </span>
-                        )}
+                          <div className="space-y-2">
+                            {/* Practice Badge */}
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-900/30 text-blue-400 rounded text-xs font-semibold">
+                                <span>🎯</span>
+                                <span>Practice Mode</span>
+                              </span>
 
-                        <span className="text-xs text-slate-500">
-                          {new Date(parlay.created_at).toLocaleDateString()}
-                        </span>
+                              {/* Upgrade Button - Only show if not resolved and not locked */}
+                              {parlay.is_hit === null && !parlay.is_locked && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation(); // Prevent card click
+                                    handleUpgradeParlay(parlay.id, parlay.parlay_name);
+                                  }}
+                                  disabled={upgradingParlay === parlay.id}
+                                  className="text-xs px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-600 text-white rounded font-semibold transition-colors disabled:cursor-not-allowed"
+                                >
+                                  {upgradingParlay === parlay.id ? '⏳ Upgrading...' : '⬆️ Upgrade (100 SMS)'}
+                                </button>
+                              )}
+                            </div>
+
+                            {/* Help text for practice parlays */}
+                            {parlay.is_hit === null && !parlay.is_locked && (
+                              <p className="text-xs text-blue-300/70">
+                                💡 Upgrade to compete for weekly cash prize before first game starts
+                              </p>
+                            )}
+                          </div>
+                        ) : (
+                          <>
+                            {/* Competition Badge */}
+                            <span className="inline-flex items-center gap-1 px-2 py-1 bg-emerald-900/30 text-emerald-400 rounded text-xs font-semibold">
+                              <span>🏆</span>
+                              <span>Competition Entry</span>
+                              <span className="text-emerald-300/70">• 100 SMS Bucks</span>
+                            </span>
+                          </>
+                        )}
                       </div>
                     </div>
                   ))}

@@ -538,4 +538,40 @@ function getWeekNumber(date) {
   return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
 }
 
+// ==========================================
+// POST /api/parlay/:id/upgrade
+// Upgrade a practice parlay to competition entry
+// ==========================================
+router.post('/:id/upgrade', requireAuth, async (req, res) => {
+  try {
+    const parlayId = parseInt(req.params.id);
+    const userId = req.user.id;
+
+    if (!parlayId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid parlay ID'
+      });
+    }
+
+    // Call the upgrade service
+    const result = await parlayService.upgradePracticeParlayToCompetition(parlayId, userId);
+
+    res.json({
+      success: true,
+      message: result.message,
+      parlay: result.parlay,
+      newBalance: result.newBalance,
+      amountCharged: result.amountCharged
+    });
+
+  } catch (error) {
+    console.error('Upgrade parlay API error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to upgrade parlay'
+    });
+  }
+});
+
 export default router;

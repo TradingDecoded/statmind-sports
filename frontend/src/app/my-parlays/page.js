@@ -17,6 +17,7 @@ export default function MyParlaysPage() {
   const [error, setError] = useState(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [selectedParlay, setSelectedParlay] = useState(null);
+  const [upgradingParlay, setUpgradingParlay] = useState(null);
 
   // Auto-refresh functionality
   const {
@@ -87,7 +88,7 @@ export default function MyParlaysPage() {
           avg_leg_count: avgLegs
         }));
       }
-      
+
     } catch (err) {
       setError('Failed to load parlays');
     } finally {
@@ -110,6 +111,44 @@ export default function MyParlaysPage() {
       setUserStats(data.user);
     } catch (err) {
       console.error('Stats error:', err);
+    }
+  };
+
+  const handleUpgradeParlay = async (parlayId, parlayName) => {
+    // Confirm with user
+    const confirmed = window.confirm(
+      `Upgrade "${parlayName}" to competition entry for 100 SMS Bucks?`
+    );
+
+    if (!confirmed) return;
+
+    setUpgradingParlay(parlayId);
+
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`/api/parlay/${parlayId}/upgrade`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to upgrade parlay');
+      }
+
+      alert(`✅ Parlay upgraded! New balance: ${data.newBalance} SMS Bucks`);
+
+      // Simply reload the page to refresh everything
+      window.location.reload();
+
+    } catch (err) {
+      alert(`❌ ${err.message}`);
+      console.error('Upgrade error:', err);
+      setUpgradingParlay(null);
     }
   };
 

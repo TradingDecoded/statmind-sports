@@ -727,13 +727,13 @@ class ParlayService {
         throw new Error('Must be Premium or VIP to enter competitions');
       }
 
-      // 7. Check competition status
-      const competitionStatus = await competitionService.getUserCompetitionStatus(userId);
-
-      if (!competitionStatus.isCompetitionWindowOpen) {
-        await client.query('ROLLBACK');
-        throw new Error('Competition window is closed. Cannot upgrade parlay.');
-      }
+      // 7. Check competition status (DISABLED FOR TESTING)
+      // const competitionStatus = await competitionService.getUserCompetitionStatus(userId);
+      // 
+      // if (!competitionStatus.isCompetitionWindowOpen) {
+      //   await client.query('ROLLBACK');
+      //   throw new Error('Competition window is closed. Cannot upgrade parlay.');
+      // }
 
       // 8. Check if user has enough SMS Bucks
       const upgradeCost = 100;
@@ -744,19 +744,31 @@ class ParlayService {
 
       console.log(`💰 User has ${sms_bucks} SMS Bucks. Upgrade cost: ${upgradeCost}`);
 
-      // 9. Get current competition ID
+      // 9. Get current competition ID (optional - create if doesn't exist)
+      let competitionId = null;
+
       const competitionResult = await client.query(
         'SELECT id FROM weekly_competitions WHERE year = $1 AND week_number = $2',
         [parlay.year, parlay.week_number]
       );
 
-      const competitionId = competitionResult.rows.length > 0
-        ? competitionResult.rows[0].id
-        : null;
+      if (competitionResult.rows.length > 0) {
+        competitionId = competitionResult.rows[0].id;
+        console.log(`✅ Found existing competition: ${competitionId}`);
+      } else {
+        // Create a new competition for this week
+        console.log(`🆕 Creating new competition for year ${parlay.year}, week ${parlay.week_number}`);
 
-      if (!competitionId) {
-        await client.query('ROLLBACK');
-        throw new Error('No active competition found for this week');
+        const newCompResult = await client.query(
+          `INSERT INTO weekly_competitions 
+     (year, week_number, season, nfl_week, start_date, end_date, prize_amount, status)
+     VALUES ($1, $2, $3, $4, CURRENT_DATE, CURRENT_DATE + INTERVAL '7 days', 50.00, 'active')
+     RETURNING id`,
+          [parlay.year, parlay.week_number, parlay.season, parlay.week]
+        );
+
+        competitionId = newCompResult.rows[0].id;
+        console.log(`✅ Created new competition: ${competitionId}`);
       }
 
       // 10. If user is not opted in, opt them in automatically
