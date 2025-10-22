@@ -343,6 +343,16 @@ class CompetitionService {
       // We have a winner! (highest rank with minimum entries)
       const winner = qualifiedUsers[0];
 
+      // Increment user's lifetime competition wins
+      await client.query(
+        `UPDATE user_stats 
+   SET competitions_won = competitions_won + 1 
+   WHERE user_id = $1`,
+        [winner.user_id]
+      );
+
+      console.log(`🏆 User ${winner.user_id} now has won ${(await client.query('SELECT competitions_won FROM user_stats WHERE user_id = $1', [winner.user_id])).rows[0].competitions_won} competitions!`);
+
       // Update competition with winner
       await client.query(
         `UPDATE weekly_competitions 

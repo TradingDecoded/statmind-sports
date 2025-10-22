@@ -174,4 +174,29 @@ router.get('/competition-stats', async (req, res) => {
   }
 });
 
+// ==========================================
+// GET /api/leaderboard/champion
+
+// ==========================================
+// GET /api/leaderboard/champion
+// Get current reigning champion
+// ==========================================
+router.get('/champion', async (req, res) => {
+  try {
+    const champion = await leaderboardService.getReigningChampion();
+
+    res.json({
+      success: true,
+      champion
+    });
+
+  } catch (error) {
+    console.error('Get champion error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch champion'
+    });
+  }
+});
+
 export default router;

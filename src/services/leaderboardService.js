@@ -17,7 +17,7 @@ class LeaderboardService {
 
       // ==========================================
       // QUERY 1: GET SUMMARY STATS (TOP CARDS)
-      // Aggregate stats for all premium/VIP users with 3+ parlays
+      // Aggregate stats for all users with 3+ parlays
       // ==========================================
       const summaryResult = await pool.query(
         `SELECT 
@@ -28,13 +28,12 @@ class LeaderboardService {
          FROM users u
          INNER JOIN user_stats s ON u.id = s.user_id
          WHERE s.total_parlays >= 3
-           AND u.is_active = true
-           AND u.membership_tier IN ('premium', 'vip')`
+           AND u.is_active = true`
       );
 
       // ==========================================
       // QUERY 2: GET RANKED USERS (LEADERBOARD TABLE)
-      // Only premium/VIP users with 3+ parlays
+      // All users with 3+ parlays
       // ==========================================
       const result = await pool.query(
         `SELECT 
@@ -55,7 +54,6 @@ class LeaderboardService {
          INNER JOIN user_stats s ON u.id = s.user_id
          WHERE s.total_parlays >= 3
            AND u.is_active = true
-           AND u.membership_tier IN ('premium', 'vip')
          ORDER BY s.win_rate DESC, s.total_parlays DESC
          LIMIT $1 OFFSET $2`,
         [limit, offset]
@@ -69,8 +67,7 @@ class LeaderboardService {
          FROM users u
          INNER JOIN user_stats s ON u.id = s.user_id
          WHERE s.total_parlays >= 3
-           AND u.is_active = true
-           AND u.membership_tier IN ('premium', 'vip')`
+           AND u.is_active = true`
       );
 
       // ==========================================
@@ -135,6 +132,7 @@ class LeaderboardService {
           ws.weekly_losses,
           ws.weekly_win_rate,
           s.current_streak,
+          s.competitions_won,
           ROW_NUMBER() OVER (ORDER BY ws.weekly_win_rate DESC, ws.weekly_parlays DESC) as rank
         FROM users u
         INNER JOIN weekly_stats ws ON u.id = ws.user_id
@@ -244,7 +242,6 @@ class LeaderboardService {
           INNER JOIN user_stats s ON u.id = s.user_id
           WHERE s.total_parlays >= 3
             AND u.is_active = true
-            AND u.membership_tier IN ('premium', 'vip')
         )
         SELECT rank FROM ranked_users WHERE id = $1`,
         [userId]
@@ -277,8 +274,7 @@ class LeaderboardService {
          FROM users u
          INNER JOIN user_stats s ON u.id = s.user_id
          WHERE s.total_parlays >= 3
-           AND u.is_active = true
-           AND u.membership_tier IN ('premium', 'vip')`
+           AND u.is_active = true`
       );
 
       const totalCompetition = compResult.rows.length > 0
@@ -387,6 +383,46 @@ class LeaderboardService {
     } catch (error) {
       console.error('Error fetching competition stats:', error);
       throw error;
+    }
+  }
+
+  // ==========================================
+  // GET REIGNING CHAMPION
+  // Get the most recent competition winner
+  // ==========================================
+  async getReigningChampion() {
+    try {
+      const result = await pool.query(
+        `SELECT 
+          wc.winner_user_id,
+          wc.winner_points,
+          wc.winner_parlays,
+          wc.prize_amount,
+          wc.nfl_week,
+          wc.year,
+          wc.completed_at,
+          u.username,
+          u.display_name,
+          u.avatar_url,
+          s.competitions_won
+         FROM weekly_competitions wc
+         INNER JOIN users u ON wc.winner_user_id = u.id
+         INNER JOIN user_stats s ON u.id = s.user_id
+         WHERE wc.status = 'completed'
+           AND wc.winner_user_id IS NOT NULL
+         ORDER BY wc.completed_at DESC
+         LIMIT 1`
+      );
+
+      if (result.rows.length === 0) {
+        return null;
+      }
+
+      return result.rows[0];
+
+    } catch (error) {
+      console.error('Error fetching reigning champion:', error);
+      return null;
     }
   }
 }

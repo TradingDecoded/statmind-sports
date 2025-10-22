@@ -13,7 +13,7 @@ export default function LeaderboardPage() {
       setActiveTab('weekly');
     }
   }, []);
-  
+
   const [leaderboardData, setLeaderboardData] = useState([]);
   const [myRank, setMyRank] = useState(null);
   const [stats, setStats] = useState({
@@ -26,9 +26,11 @@ export default function LeaderboardPage() {
   const [error, setError] = useState(null);
   const router = useRouter();
   const [competitionInfo, setCompetitionInfo] = useState(null);
+  const [champion, setChampion] = useState(null);
 
   useEffect(() => {
     fetchLeaderboard();
+    fetchChampion();
   }, [activeTab]); // Re-fetch when tab changes
 
   const fetchLeaderboard = async () => {
@@ -120,6 +122,20 @@ export default function LeaderboardPage() {
     }
   };
 
+  const fetchChampion = async () => {
+    try {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://statmindsports.com/api';
+      const response = await fetch(`${API_URL}/leaderboard/champion`);
+      const data = await response.json();
+
+      if (data.success && data.champion) {
+        setChampion(data.champion);
+      }
+    } catch (err) {
+      console.error('Champion fetch error:', err);
+    }
+  };
+
   const getRankBadge = (rank) => {
     if (rank === 1) return '🥇';
     if (rank === 2) return '🥈';
@@ -202,21 +218,62 @@ export default function LeaderboardPage() {
         )}
 
         {/* Competition Info Banner (Weekly Tab Only) */}
-        {activeTab === 'weekly' && competitionInfo && (
-          <div className="bg-gradient-to-r from-green-600 to-emerald-600 rounded-lg p-6 mb-8">
-            <div className="flex justify-between items-center">
-              <div>
-                <h3 className="text-2xl font-bold mb-2">Week {competitionInfo.nfl_week} Competition</h3>
-                <p className="text-green-100">
-                  Prize Pool: <span className="font-bold text-yellow-300">${competitionInfo.prize_amount}</span>
-                  {competitionInfo.is_rollover && <span className="ml-2 text-xs bg-yellow-500 text-black px-2 py-1 rounded">ROLLOVER</span>}
-                </p>
+        {activeTab === 'weekly' && competitionInfo ? (
+          <div className="mb-6">
+            <div className="bg-gradient-to-r from-amber-600 to-orange-600 rounded-lg p-6 mb-4 shadow-xl">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <span className="text-5xl">🏈</span>
+                  <div>
+                    <div className="text-2xl font-bold text-white mb-2">
+                      🏆 NFL Week {competitionInfo.nfl_week} Competition
+                    </div>
+                    <div className="text-amber-100 text-lg">
+                      Prize Pool: <span className="text-3xl font-bold text-white">${competitionInfo.prize_amount.toFixed(2)}</span>
+                      {competitionInfo.is_rollover && (
+                        <span className="ml-3 bg-yellow-400 text-gray-900 px-3 py-1 rounded-full text-sm font-bold">
+                          🎰 ROLLOVER!
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="text-amber-100 text-sm">Competition Status</div>
+                  <div className="text-white font-bold text-xl capitalize">{competitionInfo.status}</div>
+                </div>
+              </div>
+            </div>
+            <div className="text-center">
+              <a href="/competition/rules" className="text-yellow-400 hover:text-yellow-300 underline text-sm font-semibold">
+                📋 View Weekly Competition Rules & Prize Info
+              </a>
+            </div>
+          </div>
+        ) : null}
+
+        {/* Reigning Champion Banner - Shows on Weekly tab if there's a champion */}
+        {activeTab === 'weekly' && champion && (
+          <div className="bg-gradient-to-r from-purple-900 via-pink-900 to-purple-900 border-2 border-yellow-400 rounded-xl p-6 mb-6 shadow-2xl">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <span className="text-6xl animate-pulse">👑</span>
+                <div>
+                  <div className="text-yellow-400 text-sm font-bold uppercase tracking-wider mb-1">
+                    Reigning Champion
+                  </div>
+                  <div className="text-3xl font-bold text-white mb-2">
+                    {champion.display_name || champion.username}
+                  </div>
+                  <div className="text-purple-200 text-sm">
+                    Week {champion.nfl_week} Winner • {champion.winner_points} Points • ${champion.prize_amount} Prize
+                  </div>
+                </div>
               </div>
               <div className="text-right">
-                <div className="text-sm text-green-100">Status</div>
-                <div className={`text-lg font-bold ${competitionInfo.status === 'active' ? 'text-yellow-300' : 'text-gray-300'
-                  }`}>
-                  {competitionInfo.status.toUpperCase()}
+                <div className="text-yellow-400 text-sm font-semibold mb-1">Lifetime Wins</div>
+                <div className="text-5xl font-bold text-yellow-400">
+                  {champion.competitions_won}
                 </div>
               </div>
             </div>
@@ -253,7 +310,7 @@ export default function LeaderboardPage() {
                 <tr>
                   <th className="px-6 py-4 text-left text-sm font-semibold text-gray-400">Rank</th>
                   <th className="px-6 py-4 text-left text-sm font-semibold text-gray-400">Player</th>
-                  
+
                   {activeTab === 'overall' ? (
                     <>
                       <th className="px-6 py-4 text-center text-sm font-semibold text-gray-400">Parlays</th>
@@ -261,6 +318,7 @@ export default function LeaderboardPage() {
                       <th className="px-6 py-4 text-center text-sm font-semibold text-gray-400">Record</th>
                       <th className="px-6 py-4 text-center text-sm font-semibold text-gray-400">Streak</th>
                       <th className="px-6 py-4 text-center text-sm font-semibold text-gray-400">Accuracy</th>
+                      <th className="px-6 py-4 text-center text-sm font-semibold text-gray-400">Titles</th>
                     </>
                   ) : (
                     <>
@@ -302,7 +360,14 @@ export default function LeaderboardPage() {
                             </div>
                           )}
                           <div>
-                            <div className="text-white font-semibold">{user.display_name || user.username}</div>
+                            <div className="text-white font-semibold flex items-center gap-2">
+                              {user.display_name || user.username}
+                              {user.competitions_won > 0 && (
+                                <span className="text-yellow-400 text-sm">
+                                  🏆 x{user.competitions_won}
+                                </span>
+                              )}
+                            </div>
                             <div className="text-gray-400 text-sm">@{user.username}</div>
                           </div>
                         </div>
@@ -366,6 +431,13 @@ export default function LeaderboardPage() {
                           {/* Parlays Won */}
                           <td className="px-6 py-4 text-center">
                             <span className="text-green-400 font-semibold">{user.parlays_won || 0}</span>
+                          </td>
+
+                          {/* Competitions Won */}
+                          <td className="px-6 py-4 text-center">
+                            <span className="text-yellow-400 font-bold text-lg">
+                              {user.competitions_won > 0 ? `🏆 ${user.competitions_won}` : '-'}
+                            </span>
                           </td>
 
                           {/* Membership Tier */}
