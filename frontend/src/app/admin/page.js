@@ -30,6 +30,7 @@ export default function AdminPage() {
   const [newTier, setNewTier] = useState('');
   const [actionMessage, setActionMessage] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
+  const [testUpgradeTier, setTestUpgradeTier] = useState('premium');
 
   // Prediction weights state
   const [weights, setWeights] = useState({
@@ -221,6 +222,56 @@ export default function AdminPage() {
       }
     } catch (error) {
       setActionMessage('❌ Failed to adjust balance');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Test Upgrade Function
+  const handleTestUpgrade = async () => {
+    if (!selectedMember) {
+      setActionMessage('⚠️ No user selected');
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `⚠️ TEST UPGRADE ONLY\n\nThis will upgrade ${selectedMember.username} to ${testUpgradeTier.toUpperCase()} tier as a TEST ACCOUNT.\n\nThey will receive:\n- ${testUpgradeTier === 'premium' ? '500' : '1000'} SMS Bucks\n- 30-day subscription\n- All tier benefits\n\nContinue?`
+    );
+
+    if (!confirmed) return;
+
+    setActionLoading(true);
+    const token = localStorage.getItem('authToken');
+
+    try {
+      const response = await fetch(
+        `/api/admin/management/members/${selectedMember.id}/test-upgrade`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            tier: testUpgradeTier
+          })
+        }
+      );
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setActionMessage(`✅ ${data.message}`);
+        // Refresh user details
+        fetchUserDetails(selectedMember.id);
+        // Refresh members list
+        fetchMembers();
+      } else {
+        setActionMessage(`❌ ${data.error || 'Upgrade failed'}`);
+      }
+    } catch (error) {
+      console.error('Test upgrade error:', error);
+      setActionMessage('❌ Network error - try again');
     } finally {
       setActionLoading(false);
     }
@@ -976,12 +1027,19 @@ export default function AdminPage() {
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div className="bg-slate-800 rounded-lg p-4">
                         <p className="text-slate-400 text-sm mb-1">Membership Tier</p>
-                        <p className={`text-lg font-bold ${memberDetails.user.membership_tier === 'vip' ? 'text-purple-400' :
-                          memberDetails.user.membership_tier === 'premium' ? 'text-emerald-400' :
-                            'text-slate-300'
-                          }`}>
-                          {memberDetails.user.membership_tier.toUpperCase()}
-                        </p>
+                        <div className="flex items-center gap-2">
+                          <p className={`text-lg font-bold ${memberDetails.user.membership_tier === 'vip' ? '💎text-purple-400' :
+                            memberDetails.user.membership_tier === 'premium' ? '💚text-emerald-400' :
+                              '⬜text-slate-300'
+                            }`}>
+                            {memberDetails.user.membership_tier.toUpperCase()}
+                          </p>
+                          {memberDetails.user.is_test_account && (
+                            <span className="bg-orange-900/50 text-orange-300 text-xs px-2 py-0.5 rounded border border-orange-700">
+                              🧪 TEST
+                            </span>
+                          )}
+                        </div>
                       </div>
                       <div className="bg-slate-800 rounded-lg p-4">
                         <p className="text-slate-400 text-sm mb-1">SMS Bucks</p>
@@ -1078,6 +1136,54 @@ export default function AdminPage() {
                             className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-slate-700 disabled:cursor-not-allowed text-white font-semibold py-2 rounded-lg transition"
                           >
                             {actionLoading ? 'Processing...' : 'Change Tier'}
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* TEST UPGRADE SECTION */}
+                      <div className="bg-gradient-to-r from-orange-900/30 to-red-900/30 border-2 border-orange-500 rounded-lg p-4">
+                        <div className="flex items-center gap-2 mb-3">
+                          <span className="text-2xl">🧪</span>
+                          <h4 className="font-semibold text-orange-400">TEST UPGRADE (Testing Only)</h4>
+                        </div>
+
+                        <div className="bg-orange-950/50 border border-orange-700 rounded p-3 mb-4">
+                          <p className="text-sm text-orange-200 mb-2">
+                            ⚠️ <strong>For Testing Only</strong> - Upgrades user without payment
+                          </p>
+                          <ul className="text-xs text-orange-300 space-y-1 ml-4">
+                            <li>• Marks account as TEST ACCOUNT</li>
+                            <li>• Premium: 500 SMS Bucks + 30 days</li>
+                            <li>• VIP: 1000 SMS Bucks + 30 days</li>
+                            <li>• Full competition access</li>
+                          </ul>
+                        </div>
+
+                        <div className="space-y-3">
+                          <div>
+                            <label className="block text-sm text-slate-400 mb-2">
+                              Select Tier for Test Upgrade
+                            </label>
+                            <select
+                              value={testUpgradeTier}
+                              onChange={(e) => setTestUpgradeTier(e.target.value)}
+                              className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white"
+                              disabled={actionLoading}
+                            >
+                              <option value="premium">Premium ($9.99/mo) - 500 SMS Bucks</option>
+                              <option value="vip">VIP ($19.99/mo) - 1000 SMS Bucks</option>
+                            </select>
+                          </div>
+
+                          <button
+                            onClick={handleTestUpgrade}
+                            disabled={actionLoading}
+                            className={`w-full py-2 px-4 rounded-lg font-semibold transition ${actionLoading
+                              ? 'bg-slate-700 text-slate-500 cursor-not-allowed'
+                              : 'bg-orange-600 hover:bg-orange-700 text-white'
+                              }`}
+                          >
+                            {actionLoading ? 'Upgrading...' : '🧪 Test Upgrade User'}
                           </button>
                         </div>
                       </div>

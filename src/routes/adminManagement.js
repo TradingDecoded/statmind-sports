@@ -950,4 +950,97 @@ router.post('/reset/all', async (req, res) => {
   }
 });
 
+// ==========================================
+// POST /api/admin/management/members/:userId/test-upgrade
+// TEST ONLY: Upgrade user without payment
+// ==========================================
+router.post('/members/:userId/test-upgrade', async (req, res) => {
+  const client = await pool.connect();
+
+  try {
+    const { userId } = req.params;
+    const { tier } = req.body;
+
+    // Validate tier
+    if (!['premium', 'vip'].includes(tier)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Tier must be premium or vip'
+      });
+    }
+
+    await client.query('BEGIN');
+
+    // Check if user exists
+    const userResult = await client.query(
+      'SELECT membership_tier, sms_bucks FROM users WHERE id = $1',
+      [userId]
+    );
+
+    if (userResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({
+        success: false,
+        error: 'User not found'
+      });
+    }
+
+    const now = new Date();
+    const endDate = new Date(now);
+    endDate.setMonth(endDate.getMonth() + 1); // 30 days from now
+
+    // Determine SMS Bucks amount
+    const smsBucksAmount = tier === 'premium' ? 500 : 1000;
+
+    // 1. Update user to test account with new tier
+    await client.query(
+      `UPDATE users 
+       SET membership_tier = $1,
+           subscription_start_date = $2,
+           subscription_end_date = $3,
+           is_test_account = true
+       WHERE id = $4`,
+      [tier, now, endDate, userId]
+    );
+
+    // 2. Add SMS Bucks
+    await client.query(
+      `UPDATE users 
+       SET sms_bucks = sms_bucks + $1 
+       WHERE id = $2`,
+      [smsBucksAmount, userId]
+    );
+
+    // 3. Record the transaction
+    await client.query(
+      `INSERT INTO sms_bucks_transactions 
+       (user_id, amount, transaction_type, balance_after, description)
+       VALUES ($1, $2, 'admin_adjustment', 
+               (SELECT sms_bucks FROM users WHERE id = $1),
+               $3)`,
+      [userId, smsBucksAmount, `TEST UPGRADE: ${tier} tier test account`]
+    );
+
+    await client.query('COMMIT');
+
+    res.json({
+      success: true,
+      message: `User upgraded to ${tier} TEST account`,
+      tier: tier,
+      smsBucksAdded: smsBucksAmount,
+      subscriptionEnd: endDate
+    });
+
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Test upgrade error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to upgrade test account'
+    });
+  } finally {
+    client.release();
+  }
+});
+
 export default router;
