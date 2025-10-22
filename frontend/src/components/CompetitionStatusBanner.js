@@ -88,18 +88,20 @@ export default function CompetitionStatusBanner({ status }) {
 
       case 'not_qualified':
         return {
-          bgColor: 'bg-gradient-to-r from-yellow-900/40 to-orange-900/40',
-          borderColor: 'border-yellow-600/50',
-          icon: '⚠️',
-          title: 'Competition Entry',
-          count: `${parlayCount}/3 Parlays`,
-          message: `Create ${3 - parlayCount} more to qualify for $${prizeAmount}!`,
-          showButton: false,
+          bgColor: 'bg-gradient-to-r from-blue-900/30 to-indigo-900/30',
+          borderColor: 'border-blue-500/40',
+          icon: '🎯',
+          title: 'Weekly Competition',
+          count: `${parlayCount}/${maxParlays} Parlays`,
+          message: `Create your first parlay to compete for $${prizeAmount}`,
+          showButton: true,
+          buttonText: 'View Rules →',
+          buttonAction: () => router.push('/competition/rules'),
         };
 
       default:
         const potentialPoints = parlayCount * 6;
-        
+
         return {
           bgColor: 'bg-gradient-to-br from-purple-900/50 via-blue-900/50 to-indigo-900/50',
           borderColor: 'border-purple-500/60',
@@ -124,7 +126,7 @@ export default function CompetitionStatusBanner({ status }) {
       <div className="relative">
         {/* COLLAPSED STATE */}
         {!isExpanded && (
-          <div 
+          <div
             onClick={toggleExpanded}
             className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 rounded-xl shadow-lg px-6 py-4 cursor-pointer transition-all transform hover:scale-[1.02] border-2 border-purple-400/50"
           >
@@ -147,10 +149,10 @@ export default function CompetitionStatusBanner({ status }) {
                 >
                   Upgrade Now
                 </button>
-                <svg 
+                <svg
                   className="w-5 h-5 text-white transition-transform"
-                  fill="none" 
-                  stroke="currentColor" 
+                  fill="none"
+                  stroke="currentColor"
                   viewBox="0 0 24 24"
                 >
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -162,22 +164,22 @@ export default function CompetitionStatusBanner({ status }) {
 
         {/* EXPANDED STATE */}
         {isExpanded && (
-          <div 
+          <div
             className={`${config.bgColor} border-2 ${config.borderColor} rounded-xl shadow-2xl p-6 relative overflow-hidden animate-slide-down`}
           >
             {/* Animated background effect */}
             <div className="absolute inset-0 bg-gradient-to-r from-purple-600/10 via-blue-600/10 to-pink-600/10 animate-gradient-x"></div>
-            
+
             {/* Collapse button */}
             <button
               onClick={toggleExpanded}
               className="absolute top-4 right-4 text-slate-400 hover:text-white transition z-10 flex items-center gap-2 text-sm"
             >
               <span>Collapse</span>
-              <svg 
+              <svg
                 className="w-4 h-4"
-                fill="none" 
-                stroke="currentColor" 
+                fill="none"
+                stroke="currentColor"
                 viewBox="0 0 24 24"
               >
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
@@ -216,7 +218,7 @@ export default function CompetitionStatusBanner({ status }) {
                 <div className="bg-black/30 rounded-lg p-3 border border-pink-500/30">
                   <div className="text-pink-300 text-xs font-semibold mb-1">👥 ACTIVE PLAYERS</div>
                   <div className="text-white text-xl font-bold">
-                    {status.competition?.totalParticipants || 12}
+                    {status.competition?.totalParticipants || 0}
                   </div>
                   <div className="text-slate-400 text-xs">Competing this week</div>
                 </div>
@@ -327,9 +329,8 @@ export default function CompetitionStatusBanner({ status }) {
         <div className="mt-4">
           <div className="w-full bg-slate-800/60 rounded-full h-2 overflow-hidden">
             <div
-              className={`h-full transition-all duration-500 ${
-                status.statusType === 'qualified' ? 'bg-green-400' : 'bg-yellow-400'
-              }`}
+              className={`h-full transition-all duration-500 ${status.statusType === 'qualified' ? 'bg-green-400' : 'bg-yellow-400'
+                }`}
               style={{ width: `${(status.parlayCount / status.maxParlays) * 100}%` }}
             />
           </div>

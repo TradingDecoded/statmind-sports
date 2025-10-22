@@ -129,12 +129,13 @@ router.get('/status', requireAuth, async (req, res) => {
         ...status,
         parlayCount,
         competitionId: competition ? competition.id : null,
-        statusType, // NEW: Add statusType for banner
+        statusType,
         maxParlays,
         minToQualify,
         competition: competition ? {
           prizeAmount: parseFloat(competition.prize_amount),
-          isRollover: competition.is_rollover
+          isRollover: competition.is_rollover,
+          totalParticipants: parseInt(competition.total_participants) || 0
         } : null
       }
     });

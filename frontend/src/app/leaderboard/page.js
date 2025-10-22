@@ -176,7 +176,7 @@ export default function LeaderboardPage() {
           <button
             onClick={() => setActiveTab('weekly')}
             className={`px-8 py-3 rounded-lg font-semibold transition-all ${activeTab === 'weekly'
-              ? 'bg-green-600 text-white shadow-lg'
+              ? 'bg-blue-600 text-white shadow-lg'
               : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
               }`}
           >

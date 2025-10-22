@@ -256,7 +256,14 @@ export default function ParlayBuilderPage() {
       }
 
       alert('Parlay saved successfully! 🎉');
-      router.push('/my-parlays');
+      // Reset form to build another parlay
+      setSelectedPicks([]);
+      setParlayName('');
+      setCalculation(null);
+      // Refresh the games and user parlays
+      fetchAvailableGames();
+      fetchCompetitionStatus();
+      fetchUserParlays();
     } catch (err) {
       // Show the actual error message from the backend
       const errorMessage = err.message || 'Failed to save parlay. Please try again.';
