@@ -8,6 +8,8 @@ export default function UpgradePage() {
   const router = useRouter();
   const [currentTier, setCurrentTier] = useState('free');
   const [loading, setLoading] = useState(true);
+  const [testModeEnabled, setTestModeEnabled] = useState(false);
+  const [upgradingTest, setUpgradingTest] = useState(false);
 
   useEffect(() => {
     if (!user) {
@@ -15,12 +17,13 @@ export default function UpgradePage() {
       return;
     }
     fetchMembershipInfo();
+    checkTestModeStatus();
   }, [user]);
 
   const fetchMembershipInfo = async () => {
     try {
       const token = localStorage.getItem('authToken');
-      
+
       if (!token) {
         router.push('/login');
         return;
@@ -41,9 +44,59 @@ export default function UpgradePage() {
     }
   };
 
+  const checkTestModeStatus = async () => {
+    try {
+      const response = await fetch('/api/test-mode/status');
+      if (response.ok) {
+        const data = await response.json();
+        setTestModeEnabled(data.enabled);
+      }
+    } catch (error) {
+      console.error('Error checking test mode:', error);
+    }
+  };
+
   const handleUpgrade = (tier) => {
     // TODO: Implement Stripe payment integration
     alert(`Upgrade to ${tier.toUpperCase()} coming soon! Payment integration in progress.`);
+  };
+
+  const handleTestUpgrade = async (tier) => {
+    if (!confirm(`Upgrade to ${tier.toUpperCase()} in TEST MODE?\n\nThis will:\n• Mark your account as a test account\n• Grant you ${tier === 'premium' ? '500' : '1000'} SMS Bucks\n• Give you 30 days of ${tier.toUpperCase()} access\n• NO payment required\n\nContinue?`)) {
+      return;
+    }
+
+    setUpgradingTest(true);
+
+    try {
+      const token = localStorage.getItem('authToken');
+
+      const response = await fetch('/api/test-mode/upgrade', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ tier })
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        alert(`✅ TEST UPGRADE SUCCESSFUL!\n\nYou now have:\n• ${tier.toUpperCase()} membership\n• ${data.smsBucks} SMS Bucks\n• 30 days of access\n\nThis is a TEST account and can be deleted by admin.`);
+
+        // Refresh the page to show new tier
+        window.location.reload();
+      } else {
+        alert(`❌ Test upgrade failed: ${data.error}`);
+      }
+
+    } catch (error) {
+      console.error('Test upgrade error:', error);
+      alert('❌ Test upgrade failed. Please try again.');
+    } finally {
+      setUpgradingTest(false);
+    }
   };
 
   if (loading) {
@@ -57,7 +110,7 @@ export default function UpgradePage() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-900 to-slate-800 py-12 px-4">
       <div className="max-w-7xl mx-auto">
-        
+
         {/* Header */}
         <div className="text-center mb-12">
           <h1 className="text-5xl font-bold text-white mb-4">
@@ -77,8 +130,8 @@ export default function UpgradePage() {
                 What are SMS Bucks?
               </h2>
               <p className="text-emerald-50 text-lg leading-relaxed">
-                SMS Bucks are our virtual currency that let you enter parlays and compete for real cash prizes. 
-                Each parlay costs SMS Bucks based on the number of legs (50-150 bucks). Win your parlay and earn 
+                SMS Bucks are our virtual currency that let you enter parlays and compete for real cash prizes.
+                Each parlay costs SMS Bucks based on the number of legs (50-150 bucks). Win your parlay and earn
                 rewards! Premium and VIP members get monthly SMS Bucks allowances plus daily login bonuses.
               </p>
             </div>
@@ -87,17 +140,16 @@ export default function UpgradePage() {
 
         {/* Pricing Cards */}
         <div className="grid md:grid-cols-3 gap-8 mb-12">
-          
+
           {/* FREE TIER */}
-          <div className={`bg-slate-800 rounded-2xl p-8 border-2 ${
-            currentTier === 'free' ? 'border-slate-600' : 'border-slate-700'
-          } relative`}>
+          <div className={`bg-slate-800 rounded-2xl p-8 border-2 ${currentTier === 'free' ? 'border-slate-600' : 'border-slate-700'
+            } relative`}>
             {currentTier === 'free' && (
               <div className="absolute top-4 right-4 bg-slate-600 text-white px-3 py-1 rounded-full text-sm font-semibold">
                 Current Plan
               </div>
             )}
-            
+
             <div className="text-center mb-6">
               <div className="text-4xl mb-3">🆓</div>
               <h3 className="text-2xl font-bold text-white mb-2">Free</h3>
@@ -144,13 +196,13 @@ export default function UpgradePage() {
             <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 bg-yellow-400 text-slate-900 px-4 py-1 rounded-full text-sm font-bold">
               MOST POPULAR
             </div>
-            
+
             {currentTier === 'premium' && (
               <div className="absolute top-4 right-4 bg-white text-purple-600 px-3 py-1 rounded-full text-sm font-semibold">
                 Current Plan
               </div>
             )}
-            
+
             <div className="text-center mb-6">
               <div className="text-4xl mb-3">🏆</div>
               <h3 className="text-2xl font-bold text-white mb-2">Premium</h3>
@@ -186,12 +238,26 @@ export default function UpgradePage() {
             </div>
 
             {currentTier !== 'premium' && (
-              <button
-                onClick={() => handleUpgrade('premium')}
-                className="w-full bg-white text-purple-600 py-3 rounded-xl font-bold text-lg hover:bg-purple-50 transition-all shadow-lg hover:shadow-xl"
-              >
-                Upgrade to Premium
-              </button>
+              <div className="space-y-3">
+                {/* Regular upgrade button (for future payment integration) */}
+                <button
+                  onClick={() => handleUpgrade('premium')}
+                  className="w-full bg-white text-purple-600 py-3 rounded-xl font-bold text-lg hover:bg-purple-50 transition-all shadow-lg hover:shadow-xl"
+                >
+                  Upgrade to Premium
+                </button>
+
+                {/* Test mode upgrade button */}
+                {testModeEnabled && (
+                  <button
+                    onClick={() => handleTestUpgrade('premium')}
+                    disabled={upgradingTest}
+                    className="w-full bg-yellow-400 text-slate-900 py-3 rounded-xl font-bold text-lg hover:bg-yellow-300 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed border-2 border-yellow-600"
+                  >
+                    {upgradingTest ? '⏳ Processing...' : '🧪 TEST UPGRADE (No Payment)'}
+                  </button>
+                )}
+              </div>
             )}
             {currentTier === 'premium' && (
               <div className="text-center text-purple-100 font-semibold">
@@ -207,7 +273,7 @@ export default function UpgradePage() {
                 Current Plan
               </div>
             )}
-            
+
             <div className="text-center mb-6">
               <div className="text-4xl mb-3">👑</div>
               <h3 className="text-2xl font-bold text-white mb-2">VIP</h3>
@@ -243,12 +309,26 @@ export default function UpgradePage() {
             </div>
 
             {currentTier !== 'vip' && (
-              <button
-                onClick={() => handleUpgrade('vip')}
-                className="w-full bg-white text-amber-600 py-3 rounded-xl font-bold text-lg hover:bg-amber-50 transition-all shadow-lg hover:shadow-xl"
-              >
-                Upgrade to VIP
-              </button>
+              <div className="space-y-3">
+                {/* Regular upgrade button (for future payment integration) */}
+                <button
+                  onClick={() => handleUpgrade('vip')}
+                  className="w-full bg-white text-amber-600 py-3 rounded-xl font-bold text-lg hover:bg-amber-50 transition-all shadow-lg hover:shadow-xl"
+                >
+                  Upgrade to VIP
+                </button>
+
+                {/* Test mode upgrade button */}
+                {testModeEnabled && (
+                  <button
+                    onClick={() => handleTestUpgrade('vip')}
+                    disabled={upgradingTest}
+                    className="w-full bg-yellow-400 text-slate-900 py-3 rounded-xl font-bold text-lg hover:bg-yellow-300 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed border-2 border-yellow-600"
+                  >
+                    {upgradingTest ? '⏳ Processing...' : '🧪 TEST UPGRADE (No Payment)'}
+                  </button>
+                )}
+              </div>
             )}
             {currentTier === 'vip' && (
               <div className="text-center text-amber-100 font-semibold">
@@ -264,7 +344,7 @@ export default function UpgradePage() {
           <h2 className="text-3xl font-bold text-white mb-6 text-center">
             Frequently Asked Questions
           </h2>
-          
+
           <div className="space-y-6 max-w-3xl mx-auto">
             <div>
               <h3 className="text-xl font-semibold text-emerald-400 mb-2">
@@ -280,7 +360,7 @@ export default function UpgradePage() {
                 Can I earn more SMS Bucks?
               </h3>
               <p className="text-slate-300">
-                Yes! Get +5 daily login bonus, win parlays for rewards (+25 Premium, +50 VIP), 
+                Yes! Get +5 daily login bonus, win parlays for rewards (+25 Premium, +50 VIP),
                 and earn bonuses for sharing your wins on social media.
               </p>
             </div>

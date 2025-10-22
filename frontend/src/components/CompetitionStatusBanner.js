@@ -1,9 +1,11 @@
 'use client';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '../contexts/AuthContext';
 import { useState, useEffect } from 'react';
 
 export default function CompetitionStatusBanner({ status }) {
   const router = useRouter();
+  const { user } = useAuth();
   const [isExpanded, setIsExpanded] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState('');
 
@@ -60,7 +62,7 @@ export default function CompetitionStatusBanner({ status }) {
     const prizeAmount = competition?.prizeAmount || 50;
 
     // 🚨 SECURITY: Block free users FIRST - regardless of opt-in status
-    if (accountTier === 'free') {
+    if (accountTier === 'free' && user?.membership_tier === 'free') {
       const potentialPoints = parlayCount * 6;
       return {
         bgColor: 'bg-gradient-to-br from-purple-900/50 via-blue-900/50 to-indigo-900/50',

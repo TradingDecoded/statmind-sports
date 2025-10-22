@@ -31,6 +31,10 @@ export default function AdminPage() {
   const [actionMessage, setActionMessage] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
   const [testUpgradeTier, setTestUpgradeTier] = useState('premium');
+  const [testAccounts, setTestAccounts] = useState([]);
+  const [testAccountCount, setTestAccountCount] = useState(0);
+  const [loadingTestAccounts, setLoadingTestAccounts] = useState(false);
+  const [deletingTestAccounts, setDeletingTestAccounts] = useState(false);
 
   // Prediction weights state
   const [weights, setWeights] = useState({
@@ -274,6 +278,71 @@ export default function AdminPage() {
       setActionMessage('❌ Network error - try again');
     } finally {
       setActionLoading(false);
+    }
+  };
+
+  // Fetch test accounts
+  const fetchTestAccounts = async () => {
+    setLoadingTestAccounts(true);
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch('/api/test-mode/accounts', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setTestAccounts(data.accounts);
+        setTestAccountCount(data.count);
+      } else {
+        console.error('Failed to fetch test accounts');
+      }
+    } catch (error) {
+      console.error('Error fetching test accounts:', error);
+    } finally {
+      setLoadingTestAccounts(false);
+    }
+  };
+
+  // Delete all test accounts
+  const handleDeleteAllTestAccounts = async () => {
+    if (!confirm(`⚠️ DELETE ALL TEST ACCOUNTS?\n\nThis will permanently delete ${testAccountCount} test account(s) and all their data:\n• User profiles\n• Parlays\n• SMS Bucks transactions\n• Competition entries\n\nThis action CANNOT be undone!\n\nAre you absolutely sure?`)) {
+      return;
+    }
+
+    // Double confirmation
+    if (!confirm(`⚠️ FINAL WARNING!\n\nYou are about to delete ${testAccountCount} test accounts.\n\nType YES in the next dialog to confirm.`)) {
+      return;
+    }
+
+    const confirmation = prompt('Type YES to delete all test accounts:');
+    if (confirmation !== 'YES') {
+      alert('Deletion cancelled.');
+      return;
+    }
+
+    setDeletingTestAccounts(true);
+
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch('/api/test-mode/accounts', {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        alert(`✅ ${data.message}`);
+        fetchTestAccounts(); // Refresh the list
+      } else {
+        alert(`❌ Failed to delete test accounts: ${data.error}`);
+      }
+    } catch (error) {
+      console.error('Error deleting test accounts:', error);
+      alert('❌ Failed to delete test accounts. Please try again.');
+    } finally {
+      setDeletingTestAccounts(false);
     }
   };
 
@@ -600,6 +669,18 @@ export default function AdminPage() {
               }`}
           >
             ⚙️ Prediction Weights
+          </button>
+          <button
+            onClick={() => {
+              setActiveTab('testaccounts');
+              fetchTestAccounts();
+            }}
+            className={`px-6 py-3 rounded-lg font-semibold transition ${activeTab === 'testaccounts'
+              ? 'bg-yellow-600 text-white'
+              : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+              }`}
+          >
+            🧪 Test Accounts {testAccountCount > 0 && `(${testAccountCount})`}
           </button>
         </div>
 
@@ -1251,6 +1332,93 @@ export default function AdminPage() {
                     </div>
 
                   </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* TEST ACCOUNTS TAB */}
+        {activeTab === 'testaccounts' && (
+          <div>
+            <div className="flex justify-between items-center mb-6">
+              <div>
+                <h2 className="text-2xl font-bold text-white mb-2">Test Accounts</h2>
+                <p className="text-slate-400">
+                  Manage test accounts created during pre-launch testing
+                </p>
+              </div>
+
+              {testAccountCount > 0 && (
+                <button
+                  onClick={handleDeleteAllTestAccounts}
+                  disabled={deletingTestAccounts}
+                  className="bg-red-600 hover:bg-red-700 disabled:bg-slate-700 disabled:cursor-not-allowed text-white px-6 py-3 rounded-lg font-semibold transition"
+                >
+                  {deletingTestAccounts ? '⏳ Deleting...' : `🗑️ Delete All (${testAccountCount})`}
+                </button>
+              )}
+            </div>
+
+            {loadingTestAccounts ? (
+              <div className="text-center py-12">
+                <div className="text-white text-xl">Loading test accounts...</div>
+              </div>
+            ) : testAccountCount === 0 ? (
+              <div className="bg-slate-800 rounded-lg p-8 text-center">
+                <div className="text-6xl mb-4">✅</div>
+                <h3 className="text-xl font-semibold text-white mb-2">
+                  No Test Accounts Found
+                </h3>
+                <p className="text-slate-400">
+                  All test accounts have been cleaned up or no testing has occurred yet.
+                </p>
+              </div>
+            ) : (
+              <div className="bg-slate-800 rounded-lg overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-slate-700">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-white font-semibold">Username</th>
+                        <th className="px-6 py-3 text-left text-white font-semibold">Email</th>
+                        <th className="px-6 py-3 text-left text-white font-semibold">Tier</th>
+                        <th className="px-6 py-3 text-left text-white font-semibold">SMS Bucks</th>
+                        <th className="px-6 py-3 text-left text-white font-semibold">Created</th>
+                        <th className="px-6 py-3 text-left text-white font-semibold">Last Login</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-700">
+                      {testAccounts.map((account) => (
+                        <tr key={account.id} className="hover:bg-slate-700/50">
+                          <td className="px-6 py-4 text-white">{account.username}</td>
+                          <td className="px-6 py-4 text-slate-300">{account.email}</td>
+                          <td className="px-6 py-4">
+                            <span className={`px-3 py-1 rounded-full text-sm font-semibold ${account.membership_tier === 'vip'
+                              ? 'bg-teal-600 text-white'
+                              : account.membership_tier === 'premium'
+                                ? 'bg-purple-600 text-white'
+                                : 'bg-slate-600 text-white'
+                              }`}>
+                              {account.membership_tier.toUpperCase()}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-white font-semibold">
+                            {account.sms_bucks}
+                          </td>
+                          <td className="px-6 py-4 text-slate-300">
+                            {new Date(account.created_at).toLocaleDateString()}
+                          </td>
+                          <td className="px-6 py-4 text-slate-300">
+                            {account.last_active
+                              ? new Date(account.last_active).toLocaleDateString()
+                              : 'Never'
+                            }
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             )}

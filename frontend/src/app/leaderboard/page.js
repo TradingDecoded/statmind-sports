@@ -325,6 +325,7 @@ export default function LeaderboardPage() {
                       <th className="px-6 py-4 text-center text-sm font-semibold text-gray-400">Points</th>
                       <th className="px-6 py-4 text-center text-sm font-semibold text-gray-400">Parlays Entered</th>
                       <th className="px-6 py-4 text-center text-sm font-semibold text-gray-400">Parlays Won</th>
+                      <th className="px-6 py-4 text-center text-sm font-semibold text-gray-400">Titles</th>
                       <th className="px-6 py-4 text-center text-sm font-semibold text-gray-400">Tier</th>
                     </>
                   )}
