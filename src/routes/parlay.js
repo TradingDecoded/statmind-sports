@@ -142,6 +142,7 @@ router.post('/create',
 
       const userId = req.user.id;
       const parlayData = req.body;
+      const isPracticeMode = req.body.isPracticeMode !== undefined ? req.body.isPracticeMode : false;
 
       // 🚨 SECURITY: Verify user's CURRENT tier before allowing competition parlays
       const tierCheck = await pool.query(
@@ -173,7 +174,7 @@ router.post('/create',
         parlayData.isPracticeFreeParlay = true;
       }
 
-      const result = await parlayService.createParlay(userId, parlayData);
+      const result = await parlayService.createParlay(userId, parlayData, isPracticeMode);
 
       res.status(201).json(result);
 

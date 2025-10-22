@@ -130,9 +130,10 @@ export default function UpgradePage() {
                 What are SMS Bucks?
               </h2>
               <p className="text-emerald-50 text-lg leading-relaxed">
-                SMS Bucks are our virtual currency that let you enter parlays and compete for real cash prizes.
-                Each parlay costs SMS Bucks based on the number of legs (50-150 bucks). Win your parlay and earn
-                rewards! Premium and VIP members get monthly SMS Bucks allowances plus daily login bonuses.
+                SMS Bucks are our virtual currency that let you enter competition parlays and win real cash prizes.
+                Each competition parlay costs 100 SMS Bucks (flat rate, regardless of legs). Create unlimited FREE
+                practice parlays anytime, or enter the weekly competition! Premium and VIP members get monthly SMS
+                Bucks allowances, daily login bonuses, and win rewards for hitting parlays.
               </p>
             </div>
           </div>
@@ -206,14 +207,14 @@ export default function UpgradePage() {
             <div className="text-center mb-6">
               <div className="text-4xl mb-3">🏆</div>
               <h3 className="text-2xl font-bold text-white mb-2">Premium</h3>
-              <div className="text-4xl font-bold text-white mb-1">$19.99</div>
+              <div className="text-4xl font-bold text-white mb-1">$9.99</div>
               <div className="text-purple-100">per month</div>
             </div>
 
             <div className="space-y-3 mb-8">
               <div className="flex items-start gap-3">
                 <span className="text-yellow-300 text-xl">★</span>
-                <span className="text-white font-semibold">300 SMS Bucks/month</span>
+                <span className="text-white font-semibold">500 SMS Bucks/month</span>
               </div>
               <div className="flex items-start gap-3">
                 <span className="text-yellow-300 text-xl">★</span>
@@ -221,7 +222,7 @@ export default function UpgradePage() {
               </div>
               <div className="flex items-start gap-3">
                 <span className="text-yellow-300 text-xl">★</span>
-                <span className="text-white">Enter 10 parlays/week</span>
+                <span className="text-white">Enter weekly competitions</span>
               </div>
               <div className="flex items-start gap-3">
                 <span className="text-yellow-300 text-xl">★</span>
@@ -277,14 +278,14 @@ export default function UpgradePage() {
             <div className="text-center mb-6">
               <div className="text-4xl mb-3">👑</div>
               <h3 className="text-2xl font-bold text-white mb-2">VIP</h3>
-              <div className="text-4xl font-bold text-white mb-1">$49.99</div>
+              <div className="text-4xl font-bold text-white mb-1">$19.99</div>
               <div className="text-amber-100">per month</div>
             </div>
 
             <div className="space-y-3 mb-8">
               <div className="flex items-start gap-3">
                 <span className="text-yellow-200 text-xl">★</span>
-                <span className="text-white font-semibold">750 SMS Bucks/month</span>
+                <span className="text-white font-semibold">1,000 SMS Bucks/month</span>
               </div>
               <div className="flex items-start gap-3">
                 <span className="text-yellow-200 text-xl">★</span>
@@ -292,7 +293,7 @@ export default function UpgradePage() {
               </div>
               <div className="flex items-start gap-3">
                 <span className="text-yellow-200 text-xl">★</span>
-                <span className="text-white">UNLIMITED parlays/week</span>
+                <span className="text-white">UNLIMITED competition entries per week</span>
               </div>
               <div className="flex items-start gap-3">
                 <span className="text-yellow-200 text-xl">★</span>
@@ -350,8 +351,29 @@ export default function UpgradePage() {
               <h3 className="text-xl font-semibold text-emerald-400 mb-2">
                 How do parlay costs work?
               </h3>
-              <p className="text-slate-300">
-                2-leg parlay = 50 SMS Bucks • 3-leg = 75 • 4-leg = 100 • 5-leg = 125 • 6+ legs = 150
+              <p className="text-slate-300 leading-relaxed mb-3">
+                <strong className="text-emerald-400">Competition Parlays:</strong> Flat rate of 100 SMS Bucks per parlay
+                (regardless of how many legs). These enter the weekly competition for cash prizes.
+              </p>
+              <p className="text-slate-300 leading-relaxed">
+                <strong className="text-emerald-400">Practice Parlays:</strong> Completely FREE and unlimited! Perfect for
+                testing strategies. Premium/VIP users can upgrade any practice parlay to a competition entry for 100 SMS
+                Bucks (before it locks). Free tier users always get practice parlays only.
+              </p>
+            </div>
+
+            <div>
+              <h3 className="text-xl font-semibold text-emerald-400 mb-2">
+                What's the difference between Practice and Competition mode?
+              </h3>
+              <p className="text-slate-300 leading-relaxed mb-3">
+                <strong className="text-emerald-400">Practice Mode:</strong> Create FREE unlimited parlays to test your
+                strategies. Track results and learn without spending SMS Bucks. Available to all membership tiers.
+              </p>
+              <p className="text-slate-300 leading-relaxed">
+                <strong className="text-emerald-400">Competition Mode:</strong> Premium/VIP members can enter the weekly
+                competition by opting in. Competition parlays cost 100 SMS Bucks each and compete for $50+ weekly cash prizes.
+                Competition runs Tuesday 2 AM ET through Sunday 3:50 PM ET.
               </p>
             </div>
 

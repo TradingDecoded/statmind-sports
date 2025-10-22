@@ -135,7 +135,7 @@ class ParlayService {
   // CREATE NEW PARLAY
   // Saves a user's parlay to the database with SMS Bucks integration
   // ==========================================
-  async createParlay(userId, parlayData) {
+  async createParlay(userId, parlayData, isPracticeMode = false) {
     const client = await pool.connect();
 
     try {
@@ -208,7 +208,8 @@ class ParlayService {
       console.log(`✅ No duplicate found. Proceeding with parlay creation.`);
 
       // 3. Determine if this is a practice parlay or competition parlay
-      const isPracticParlay = competitionStatus.shouldCreateFreeParlays === true;
+      // Use the isPracticeMode parameter passed from frontend (ignore competitionStatus logic)
+      const isPracticParlay = isPracticeMode; // This now comes from the toggle
       const smsBucksCost = isPracticParlay ? 0 : 100;
 
       console.log(`\n🎲 Creating ${isPracticParlay ? 'PRACTICE' : 'COMPETITION'} parlay for user ${userId}`);

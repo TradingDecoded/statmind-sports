@@ -24,6 +24,7 @@ export default function ParlayBuilderPage() {
   const { refreshBalance } = useSMSBucks();
   const [competitionStatus, setCompetitionStatus] = useState(null);
   const [userParlays, setUserParlays] = useState([]);
+  const [isPracticeMode, setIsPracticeMode] = useState(true);
 
   useEffect(() => {
     // Don't redirect while still checking auth
@@ -242,7 +243,8 @@ export default function ParlayBuilderPage() {
           parlayName: parlayName,
           season: currentSeason,
           week: currentWeek,
-          games: completeGamesData
+          games: completeGamesData,
+          isPracticeMode: isPracticeMode
         })
       });
 
@@ -552,12 +554,93 @@ export default function ParlayBuilderPage() {
                   )}
 
                   {/* Save Button - keep existing code */}
+                  {/* Practice vs Competition Toggle */}
+                  <div className="bg-slate-800/50 rounded-lg p-4 mb-4 border border-slate-700">
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="text-white font-semibold text-sm">Parlay Mode</h4>
+                      <div className="text-slate-400 text-xs">
+                        SMS Bucks: <span className="text-white font-semibold">{user?.sms_bucks || 0}</span>
+                      </div>
+                    </div>
+
+                    {/* Toggle Buttons - Stacked Vertically */}
+                    <div className="space-y-2 mb-3">
+                      {/* Practice Mode Button */}
+                      <button
+                        type="button"
+                        onClick={() => setIsPracticeMode(true)}
+                        className={`w-full py-4 px-4 rounded-lg font-semibold text-sm transition-all ${isPracticeMode
+                            ? 'bg-blue-600 text-white border-2 border-blue-400 shadow-lg'
+                            : 'bg-slate-700 text-slate-300 border-2 border-slate-600 hover:border-slate-500'
+                          }`}
+                      >
+                        <div className="flex items-center justify-center gap-3">
+                          <span className="text-2xl">🎯</span>
+                          <div className="text-center">
+                            <div className="font-bold text-base">Practice</div>
+                            <div className="text-xs opacity-90">FREE</div>
+                          </div>
+                        </div>
+                      </button>
+
+                      {/* Competition Mode Button */}
+                      <button
+                        type="button"
+                        onClick={() => setIsPracticeMode(false)}
+                        disabled={user?.membership_tier === 'free'}
+                        className={`w-full py-4 px-4 rounded-lg font-semibold text-sm transition-all ${!isPracticeMode
+                            ? 'bg-emerald-600 text-white border-2 border-emerald-400 shadow-lg'
+                            : user?.membership_tier === 'free'
+                              ? 'bg-slate-800 text-slate-500 border-2 border-slate-700 cursor-not-allowed'
+                              : 'bg-slate-700 text-slate-300 border-2 border-slate-600 hover:border-slate-500'
+                          }`}
+                      >
+                        <div className="flex items-center justify-center gap-3">
+                          <span className="text-2xl">🏆</span>
+                          <div className="text-center">
+                            <div className="font-bold text-base">Competition</div>
+                            <div className="text-xs opacity-90">100 SMS Bucks</div>
+                          </div>
+                        </div>
+                      </button>
+                    </div>
+
+                    {/* Info Message */}
+                    {isPracticeMode ? (
+                      <p className="text-blue-300 text-xs bg-blue-900/20 rounded p-2">
+                        ℹ️ Practice parlays are free and help you learn. They don't compete for prizes.
+                      </p>
+                    ) : user?.membership_tier === 'free' ? (
+                      <p className="text-amber-300 text-xs bg-amber-900/20 rounded p-2">
+                        🔒 Upgrade to Premium or VIP to enter competitions and win cash prizes!
+                      </p>
+                    ) : (
+                      <div>
+                        <p className="text-emerald-300 text-xs bg-emerald-900/20 rounded p-2 mb-2">
+                          ✅ This parlay will cost 100 SMS Bucks and compete for $50+ weekly prize
+                        </p>
+                        {(user?.sms_bucks || 0) < 100 && (
+                          <p className="text-red-300 text-xs bg-red-900/20 rounded p-2">
+                            ⚠️ Insufficient SMS Bucks! You need 100 to enter competition.
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Save Button */}
                   <button
                     onClick={handleSaveParlay}
-                    disabled={saving || selectedPicks.length < 2 || !parlayName.trim()}
-                    className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-700 disabled:cursor-not-allowed text-white font-bold py-3 px-4 rounded-lg transition mt-4"
+                    disabled={
+                      saving ||
+                      selectedPicks.length < 2 ||
+                      !parlayName.trim() ||
+                      (!isPracticeMode && (user?.sms_bucks || 0) < 100) ||
+                      (!isPracticeMode && user?.membership_tier === 'free')
+                    }
+                    className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-700 disabled:cursor-not-allowed text-white font-bold py-3 px-4 rounded-lg transition"
                   >
-                    {saving ? 'Saving...' : 'Save Parlay'}
+                    {saving ? 'Saving...' : isPracticeMode ? 'Save Practice Parlay (FREE)' : 'Save Competition Parlay (100 SMS Bucks)'}
                   </button>
                 </div>
               )}
