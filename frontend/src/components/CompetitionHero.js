@@ -20,13 +20,25 @@ export default function CompetitionHero() {
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://statmindsports.com/api';
       const response = await fetch(`${apiUrl}/competition/current`);
-      const data = await response.json();
 
-      if (data.success) {
-        setCompetition(data.competition);
+      // Handle both success and 404 (no competition) gracefully
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.competition) {
+          setCompetition(data.competition);
+        } else {
+          setCompetition(null);
+        }
+      } else if (response.status === 404) {
+        // No active competition - this is okay
+        console.log('ℹ️ No active competition found');
+        setCompetition(null);
+      } else {
+        throw new Error('Failed to fetch competition');
       }
     } catch (error) {
       console.error('Error fetching competition:', error);
+      setCompetition(null);
     } finally {
       setLoading(false);
     }
