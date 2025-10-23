@@ -813,22 +813,6 @@ class ParlayService {
           `Upgraded practice parlay to competition: ${parlay.parlay_name}`, parlayId]
       );
 
-      // 13.5 Add user to competition standings (or update parlay count)
-      if (competitionId) {
-        await client.query(
-          `INSERT INTO weekly_competition_standings 
-     (competition_id, user_id, parlays_entered, total_points, parlays_won, rank)
-     VALUES ($1, $2, 1, 0, 0, 1)
-     ON CONFLICT (competition_id, user_id) 
-     DO UPDATE SET
-       parlays_entered = weekly_competition_standings.parlays_entered + 1,
-       updated_at = NOW()`,
-          [competitionId, userId]
-        );
-
-        console.log(`✅ Updated competition standings for upgraded parlay (user ${userId})`);
-      }
-
       // 14. Update weekly parlay count (now counts as competition entry)
       await client.query(
         `INSERT INTO weekly_parlay_counts (user_id, year, week_number, parlay_count, last_parlay_date)
