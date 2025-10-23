@@ -184,7 +184,7 @@ export default function Navigation({ onFeedbackClick }) {
                           My Parlays
                         </Link>
                         <Link
-                          href="/profile"
+                          href={`/profile/${user.username}`}
                           onClick={() => setIsUserMenuOpen(false)}
                           className="block px-4 py-2 text-sm text-slate-300 hover:text-white hover:bg-slate-700 transition-colors"
                         >
@@ -327,7 +327,7 @@ export default function Navigation({ onFeedbackClick }) {
                       My Parlays
                     </Link>
                     <Link
-                      href="/profile"
+                      href={`/profile/${user.username}`}
                       onClick={() => setIsMenuOpen(false)}
                       className="px-4 py-3 rounded-lg text-base font-medium text-slate-300 hover:text-white hover:bg-slate-700 transition-all duration-200 block"
                     >
