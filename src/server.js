@@ -26,6 +26,7 @@ import smsBucksRoutes from './routes/smsBucks.js';
 import competitionRoutes from './routes/competition.js';
 import adminManagementRoutes from './routes/adminManagement.js';
 import testModeRoutes from './routes/testMode.js';
+import feedbackRoutes from './routes/feedback.js';
 
 dotenv.config();
 const app = express();
@@ -152,6 +153,7 @@ app.use('/api/sms-bucks', smsBucksRoutes);
 app.use('/api/competition', competitionRoutes);
 app.use('/api/admin/management', adminManagementRoutes);
 app.use('/api/test-mode', testModeRoutes);
+app.use('/api/feedback', feedbackRoutes);
 
 // ======================================
 // Start Server
