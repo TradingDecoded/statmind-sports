@@ -6,6 +6,7 @@ import { useSMSBucks } from '../../contexts/SMSBucksContext';
 import { formatShortGameDateTime } from '@/utils/dateTimeUtils';
 import { getTeamLogo } from '@/utils/teamLogos';
 import CompetitionStatusBanner from '../../components/CompetitionStatusBanner';
+import PracticeModeBanner from '@/components/PracticeModeBanner';
 
 export default function ParlayBuilderPage() {
   const router = useRouter();
@@ -347,9 +348,11 @@ export default function ParlayBuilderPage() {
           {/* Right: Competition Status Banner */}
           {competitionStatus && (
             <div className="flex-shrink-0 w-[700px]">
-              <CompetitionStatusBanner
-                status={competitionStatus}
-              />
+              {competitionStatus.accountTier === 'free' ? (
+                <PracticeModeBanner status={competitionStatus} />
+              ) : (
+                <CompetitionStatusBanner status={competitionStatus} />
+              )}
             </div>
           )}
         </div>

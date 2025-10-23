@@ -107,16 +107,59 @@ router.get('/status', requireAuth, async (req, res) => {
     if (userTier === 'free') {
       const competition = await competitionService.getCurrentCompetition();
 
+      // Get free user's PRACTICE parlays with leg counts for current week
+      let parlayCount = 0;
+      let hypotheticalPoints = 0;
+      if (competition) {
+        const parlayResult = await pool.query(
+          `SELECT leg_count
+     FROM user_parlays 
+     WHERE user_id = $1 
+     AND season = $2
+     AND week = $3
+     AND is_practice_parlay = TRUE`,
+          [userId, competition.season, competition.nfl_week]
+        );
+
+        parlayCount = parlayResult.rows.length;
+
+        // Calculate hypothetical points based on actual leg counts
+        hypotheticalPoints = parlayResult.rows.reduce((total, parlay) => {
+          const legCount = parlay.leg_count;
+          let points = 0;
+          if (legCount === 2) points = 2;
+          else if (legCount === 3) points = 6;
+          else if (legCount === 4) points = 12;
+          else if (legCount === 5) points = 25;
+          else if (legCount >= 6) points = 50;
+          return total + points;
+        }, 0);
+      }
+
+      // Get active players count for this week
+      let activePlayersCount = 0;
+      if (competition) {
+        const playersResult = await pool.query(
+          `SELECT COUNT(DISTINCT user_id) as count
+       FROM weekly_competition_standings
+       WHERE competition_id = $1`,
+          [competition.id]
+        );
+        activePlayersCount = parseInt(playersResult.rows[0].count);
+      }
+
       return res.json({
         success: true,
         status: {
           accountTier: 'free',
-          isOptedIn: false,  // Always false for free users
+          isOptedIn: false,
           isCompetitionWindowOpen: false,
           shouldCreateFreeParlays: true,
           canOptIn: false,
-          isEligible: false,  // NEW: Explicit eligibility flag
-          parlayCount: 0,
+          isEligible: false,
+          parlayCount: parlayCount,  // ← NOW IT'S DYNAMIC!
+          hypotheticalPoints: hypotheticalPoints,
+          activePlayersCount: activePlayersCount,
           competitionId: competition ? competition.id : null,
           statusType: 'default',
           maxParlays: 20,
