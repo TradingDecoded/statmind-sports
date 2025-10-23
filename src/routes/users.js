@@ -11,7 +11,7 @@ router.get('/:username', async (req, res) => {
 
     // Get user basic info
     const userResult = await pool.query(
-      'SELECT id, username, email, display_name, created_at FROM users WHERE username = $1',
+      'SELECT id, username, email, display_name, created_at FROM users WHERE username = $1 AND is_test_account = FALSE',
       [username]
     );
 
