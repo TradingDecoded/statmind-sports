@@ -44,6 +44,10 @@ router.get("/week/:season/:week", async (req, res) => {
     g.is_final AS "isFinal",
     ht.name AS "homeTeamName",
     at.name AS "awayTeamName",
+    hts.wins AS "homeWins",
+    hts.losses AS "homeLosses",
+    ats.wins AS "awayWins",
+    ats.losses AS "awayLosses",
     p.predicted_winner AS "predictedWinner",
     p.confidence,
     p.home_win_probability AS "homeWinProbability",
@@ -64,6 +68,8 @@ router.get("/week/:season/:week", async (req, res) => {
   JOIN games g ON p.game_id = g.game_id
   LEFT JOIN teams ht ON g.home_team = ht.key
   LEFT JOIN teams at ON g.away_team = at.key
+  LEFT JOIN team_statistics hts ON g.home_team = hts.team_key
+  LEFT JOIN team_statistics ats ON g.away_team = ats.team_key
   LEFT JOIN prediction_results pr ON g.game_id = pr.game_id
   LEFT JOIN injury_tracking it ON g.id = it.game_id AND it.regenerated = TRUE
   WHERE g.season = $1 AND g.week = $2
@@ -104,7 +110,11 @@ router.get("/upcoming", async (req, res) => {
         g.away_team AS "awayTeamKey",
         ht.name AS "homeTeamName",
         at.name AS "awayTeamName",
-        p.predicted_winner AS "predictedWinner",
+    hts.wins AS "homeWins",
+    hts.losses AS "homeLosses",
+    ats.wins AS "awayWins",
+    ats.losses AS "awayLosses",
+    p.predicted_winner AS "predictedWinner",
         p.confidence,
         p.home_win_probability AS "homeWinProbability",
         p.away_win_probability AS "awayWinProbability",
@@ -118,6 +128,8 @@ router.get("/upcoming", async (req, res) => {
       JOIN games g ON p.game_id = g.game_id
       LEFT JOIN teams ht ON g.home_team = ht.key
       LEFT JOIN teams at ON g.away_team = at.key
+      LEFT JOIN team_statistics hts ON g.home_team = hts.team_key
+  LEFT JOIN team_statistics ats ON g.away_team = ats.team_key
       WHERE g.home_score IS NULL
         AND g.game_date >= NOW()
       ORDER BY g.game_date ASC
@@ -159,7 +171,11 @@ router.get("/game/:gameId", async (req, res) => {
         g.away_team AS "awayTeam",
         ht.name AS "homeTeamName",
         at.name AS "awayTeamName",
-        g.home_score AS "homeScore",
+    hts.wins AS "homeWins",
+    hts.losses AS "homeLosses",
+    ats.wins AS "awayWins",
+    ats.losses AS "awayLosses",
+    p.predicted_winner AS "predictedWinner",
         g.away_score AS "awayScore",
         p.predicted_winner AS "predictedWinner",
         p.confidence,
@@ -176,6 +192,8 @@ router.get("/game/:gameId", async (req, res) => {
       JOIN games g ON p.game_id = g.game_id
       LEFT JOIN teams ht ON g.home_team = ht.key
       LEFT JOIN teams at ON g.away_team = at.key
+      LEFT JOIN team_statistics hts ON g.home_team = hts.team_key
+  LEFT JOIN team_statistics ats ON g.away_team = ats.team_key
       LEFT JOIN prediction_results pr ON p.game_id = pr.game_id
       WHERE g.game_id = $1
       `,
@@ -352,7 +370,11 @@ router.get("/results", async (req, res) => {
         g.away_score AS "awayScore",
         ht.name AS "homeTeamName",
         at.name AS "awayTeamName",
-        p.predicted_winner AS "predictedWinner",
+    hts.wins AS "homeWins",
+    hts.losses AS "homeLosses",
+    ats.wins AS "awayWins",
+    ats.losses AS "awayLosses",
+    p.predicted_winner AS "predictedWinner",
         p.confidence,
         p.home_win_probability AS "homeWinProbability",
         p.away_win_probability AS "awayWinProbability",
@@ -363,6 +385,8 @@ router.get("/results", async (req, res) => {
       INNER JOIN prediction_results pr ON g.game_id = pr.game_id
       LEFT JOIN teams ht ON g.home_team = ht.key
       LEFT JOIN teams at ON g.away_team = at.key
+      LEFT JOIN team_statistics hts ON g.home_team = hts.team_key
+  LEFT JOIN team_statistics ats ON g.away_team = ats.team_key
       WHERE g.home_score IS NOT NULL AND g.away_score IS NOT NULL
     `;
 
@@ -520,8 +544,12 @@ router.get("/results/:gameId", async (req, res) => {
         ht.name AS "homeTeamName",
         ht.city AS "homeTeamCity",
         at.name AS "awayTeamName",
+    hts.wins AS "homeWins",
+    hts.losses AS "homeLosses",
+    ats.wins AS "awayWins",
+    ats.losses AS "awayLosses",
+    p.predicted_winner AS "predictedWinner",
         at.city AS "awayTeamCity",
-        p.predicted_winner AS "predictedWinner",
         p.confidence,
         p.home_win_probability AS "homeWinProbability",
         p.away_win_probability AS "awayWinProbability",
@@ -538,6 +566,8 @@ router.get("/results/:gameId", async (req, res) => {
       INNER JOIN prediction_results pr ON g.game_id = pr.game_id
       LEFT JOIN teams ht ON g.home_team = ht.key
       LEFT JOIN teams at ON g.away_team = at.key
+      LEFT JOIN team_statistics hts ON g.home_team = hts.team_key
+  LEFT JOIN team_statistics ats ON g.away_team = ats.team_key
       WHERE g.game_id = $1 
         AND g.home_score IS NOT NULL 
         AND g.away_score IS NOT NULL

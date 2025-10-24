@@ -14,6 +14,10 @@ export default function PredictionCard({ prediction }) {
   const {
     homeTeamKey,
     awayTeamKey,
+    homeWins,
+    homeLosses,
+    awayWins,
+    awayLosses,
     predictedWinner,
     confidence,
     homeWinProbability,
@@ -53,7 +57,7 @@ export default function PredictionCard({ prediction }) {
   // FINISHED GAME - Use ResultCard layout
   if (hasScores) {
     const wasCorrect = isCorrect;
-    const isHomeActualWinner = actualWinner === homeTeamKey;
+    const isHomeActualWinner = homeScore > awayScore;
 
     return (
       <>
@@ -115,9 +119,14 @@ export default function PredictionCard({ prediction }) {
                   className="w-12 h-12 object-contain"
                 />
                 <div>
-                  <p className="text-white font-semibold">{awayTeamKey}</p>
+                  <div>
+                    <p className="text-white font-semibold">{awayTeamKey}</p>
+                    {awayWins !== null && awayLosses !== null && (
+                      <p className="text-slate-400 text-xs">({awayWins}-{awayLosses})</p>
+                    )}
+                  </div>
                   <p className="text-2xl font-bold text-white">{awayScore}</p>
-                  {!isHomeActualWinner && <span className="text-emerald-400 text-xs">WINNER</span>}
+                  {isFinal && !isHomeActualWinner && <span className="text-emerald-400 text-xs">WINNER</span>}
                 </div>
               </div>
 
@@ -127,9 +136,14 @@ export default function PredictionCard({ prediction }) {
               {/* Home Team */}
               <div className="flex items-center space-x-3">
                 <div className="text-right">
-                  <p className="text-white font-semibold">{homeTeamKey}</p>
+                  <div>
+                    <p className="text-white font-semibold">{homeTeamKey}</p>
+                    {homeWins !== null && homeLosses !== null && (
+                      <p className="text-slate-400 text-xs">({homeWins}-{homeLosses})</p>
+                    )}
+                  </div>
                   <p className="text-2xl font-bold text-white">{homeScore}</p>
-                  {isHomeActualWinner && <span className="text-emerald-400 text-xs">WINNER</span>}
+                  {isFinal && isHomeActualWinner && <span className="text-emerald-400 text-xs">WINNER</span>}
                 </div>
                 <img
                   src={getTeamLogo(homeTeamKey)}
@@ -228,6 +242,9 @@ export default function PredictionCard({ prediction }) {
               />
               <div>
                 <p className="text-white font-semibold">{awayTeamKey}</p>
+                {awayWins !== null && awayLosses !== null && (
+                  <p className="text-slate-400 text-xs">({awayWins}-{awayLosses})</p>
+                )}
                 <p className="text-slate-400 text-sm">{awayProb.toFixed(1)}%</p>
               </div>
             </div>
@@ -239,6 +256,9 @@ export default function PredictionCard({ prediction }) {
             <div className={`flex items-center space-x-3 transition-opacity ${isHomeWinner ? '' : 'opacity-50'}`}>
               <div className="text-right">
                 <p className="text-white font-semibold">{homeTeamKey}</p>
+                {homeWins !== null && homeLosses !== null && (
+                  <p className="text-slate-400 text-xs">({homeWins}-{homeLosses})</p>
+                )}
                 <p className="text-slate-400 text-sm">{homeProb.toFixed(1)}%</p>
               </div>
               <img
