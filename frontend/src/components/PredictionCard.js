@@ -8,6 +8,62 @@ import ConfidenceBadge from './ConfidenceBadge';
 import GameDetailModal from './GameDetailModal';
 import LiveBadge from './LiveBadge';
 
+// Helper function to get current week (matches predictions/page.js logic)
+function getCurrentWeek() {
+  const now = new Date();
+  const seasonStartDate = new Date(2025, 8, 4); // Sept 4, 2025
+  const daysSinceStart = Math.floor((now - seasonStartDate) / (1000 * 60 * 60 * 24));
+  let week = Math.floor(daysSinceStart / 7) + 1;
+  if (week < 1) week = 1;
+  if (week > 18) week = 18;
+  return week;
+}
+
+// Helper function to calculate when predictions will be available for a given week
+function getPredictionAvailableDate(weekNumber) {
+  const seasonStartDate = new Date(2025, 8, 4); // Sept 4, 2025 (month is 0-indexed)
+
+  // Calculate the Monday of the target week
+  const daysToWeekStart = (weekNumber - 1) * 7;
+  const weekStartDate = new Date(seasonStartDate);
+  weekStartDate.setDate(seasonStartDate.getDate() + daysToWeekStart);
+
+  // Find the Tuesday after that week's games (games end Monday night)
+  // Add 5 days to get to the following Tuesday
+  const tuesdayDate = new Date(weekStartDate);
+  tuesdayDate.setDate(weekStartDate.getDate() + 5);
+  tuesdayDate.setHours(2, 0, 0, 0); // 2:00 AM
+
+  return tuesdayDate;
+}
+
+// Helper function to format the prediction availability message
+function getPredictionMessage(weekNumber, currentWeek) {
+  const availableDate = getPredictionAvailableDate(weekNumber);
+  const now = new Date();
+
+  // Calculate days until available
+  const daysUntil = Math.ceil((availableDate - now) / (1000 * 60 * 60 * 24));
+
+  // Format the date nicely
+  const dateOptions = { month: 'short', day: 'numeric' };
+  const formattedDate = availableDate.toLocaleDateString('en-US', dateOptions);
+
+  // Next week (show countdown)
+  if (weekNumber === currentWeek + 1) {
+    if (daysUntil === 0) {
+      return "Predictions available today at 2:00 AM EST";
+    } else if (daysUntil === 1) {
+      return "Predictions available tomorrow at 2:00 AM EST";
+    } else if (daysUntil <= 7) {
+      return `Predictions available in ${daysUntil} days (${formattedDate} at 2:00 AM EST)`;
+    }
+  }
+
+  // Future weeks (just show date)
+  return `Week ${weekNumber} predictions available ${formattedDate} at 2:00 AM EST`;
+}
+
 export default function PredictionCard({ prediction }) {
   const [showModal, setShowModal] = useState(false);
 
@@ -28,6 +84,7 @@ export default function PredictionCard({ prediction }) {
     actualWinner,
     isCorrect,
     date,
+    week,
     injuredPlayer,
     injuredPosition,
     injuredTeam,
@@ -45,6 +102,10 @@ export default function PredictionCard({ prediction }) {
   const hasScores = homeScore !== null && awayScore !== null;
   const actualHomeWinner = homeScore > awayScore;
 
+  // Check if this game should show predictions (current week only OR if game has started)
+  const currentWeek = getCurrentWeek();
+  const showPrediction = week === currentWeek || hasScores;
+
   // Convert probabilities
   let homeProb = parseFloat(homeWinProbability) || 0;
   let awayProb = parseFloat(awayWinProbability) || 0;
@@ -54,7 +115,7 @@ export default function PredictionCard({ prediction }) {
   // Get the predicted team's probability
   const predictedProb = predictedWinner === homeTeamKey ? homeProb : awayProb;
 
-  // FINISHED GAME - Use ResultCard layout
+  // FINISHED GAME - Use ResultCard layout (always show full details)
   if (hasScores) {
     const wasCorrect = isCorrect;
     const isHomeActualWinner = homeScore > awayScore;
@@ -68,7 +129,7 @@ export default function PredictionCard({ prediction }) {
             }`}
           onClick={() => setShowModal(true)}
         >
-          {/* Header with Result Badge - ADDED TIME HERE */}
+          {/* Header with Result Badge */}
           <div className={`px-4 py-2 border-b flex items-center justify-between ${wasCorrect
             ? 'bg-emerald-500/10 border-emerald-500/30'
             : 'bg-red-500/10 border-red-500/30'
@@ -190,7 +251,70 @@ export default function PredictionCard({ prediction }) {
     );
   }
 
-  // UPCOMING GAME - Original prediction layout
+  // SCHEDULE-ONLY VIEW (Future Weeks)
+  if (!showPrediction) {
+    return (
+      <div className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+        {/* Date Header */}
+        <div className="bg-slate-900/50 px-4 py-2 border-b border-slate-700 flex items-center justify-between">
+          <p className="text-slate-400 text-sm">
+            {formatGameDateTime(date, true)}
+          </p>
+          <span className="text-slate-500 text-xs px-2 py-1 bg-slate-800 rounded">UPCOMING</span>
+        </div>
+
+        {/* Teams - Schedule Only */}
+        <div className="p-6">
+          <div className="flex items-center justify-between mb-4">
+            {/* Away Team */}
+            <div className="flex items-center space-x-3">
+              <img
+                src={getTeamLogo(awayTeamKey)}
+                alt={getTeamName(awayTeamKey)}
+                className="w-12 h-12 object-contain"
+              />
+              <div>
+                <p className="text-white font-semibold">{awayTeamKey}</p>
+                {awayWins !== null && awayLosses !== null && (
+                  <p className="text-slate-400 text-xs">({awayWins}-{awayLosses})</p>
+                )}
+              </div>
+            </div>
+
+            {/* VS */}
+            <div className="text-slate-500 font-bold text-sm">@</div>
+
+            {/* Home Team */}
+            <div className="flex items-center space-x-3">
+              <div className="text-right">
+                <p className="text-white font-semibold">{homeTeamKey}</p>
+                {homeWins !== null && homeLosses !== null && (
+                  <p className="text-slate-400 text-xs">({homeWins}-{homeLosses})</p>
+                )}
+              </div>
+              <img
+                src={getTeamLogo(homeTeamKey)}
+                alt={getTeamName(homeTeamKey)}
+                className="w-12 h-12 object-contain"
+              />
+            </div>
+          </div>
+
+          {/* Schedule-Only Message */}
+          <div className="text-center pt-4 border-t border-slate-700">
+            <p className="text-slate-400 text-sm">
+              <svg className="w-4 h-4 mr-2 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              {getPredictionMessage(week, currentWeek)}
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // CURRENT WEEK GAME - Full prediction layout
   return (
     <>
       <div
@@ -269,7 +393,7 @@ export default function PredictionCard({ prediction }) {
             </div>
           </div>
 
-          {/* Probability Bar - ORIGINAL COLORS PRESERVED */}
+          {/* Probability Bar */}
           <div className="mb-4">
             <div className="w-full bg-slate-700 rounded-full h-2 overflow-hidden flex">
               <div

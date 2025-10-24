@@ -79,86 +79,91 @@ class AIReasoningService {
       homeStats,
       awayStats,
       confidence,
-      injuryContext  // <-- NEW: Injury information
+      injuryContext
     } = data;
 
     const favoredTeam = home_win_probability > 0.5 ? home_team : away_team;
+    const underdog = home_win_probability > 0.5 ? away_team : home_team;
     const winProbability = Math.round(Math.max(home_win_probability, away_win_probability) * 100);
-    const isHomeTeamFavored = home_win_probability > 0.5;
+    const spread = Math.abs(eloScore * 0.4).toFixed(1); // Rough spread estimate
 
-    // Identify key factors
-    const componentScores = [
-      { name: 'Elo Rating', score: Math.abs(eloScore), weight: '35%', raw: eloScore },
-      { name: 'Power Rating', score: Math.abs(powerScore), weight: '15%', raw: powerScore },
-      { name: 'Home/Away Performance', score: Math.abs(situationalScore), weight: '25%', raw: situationalScore },
-      { name: 'Matchup Analysis', score: Math.abs(matchupScore), weight: '20%', raw: matchupScore },
-      { name: 'Recent Form', score: Math.abs(recentFormScore), weight: '5%', raw: recentFormScore }
-    ];
+    // Determine what type of game this is
+    const gameNarrative = this.determineGameNarrative(data);
 
-    // Sort by impact (absolute value)
-    componentScores.sort((a, b) => b.score - a.score);
-    const topFactors = componentScores.slice(0, 3);
-
-    // BUILD INJURY ALERT if injury context exists
-    let injuryAlert = '';
+    // Build injury context if available
+    let injurySection = '';
     if (injuryContext) {
-      injuryAlert = `\n🚨 **CRITICAL INJURY UPDATE:**
-${injuryContext.playerName} (${injuryContext.teamAbbr} ${injuryContext.position}) is ruled OUT for this game.
-This is a key player absence that significantly impacts the prediction. You MUST mention this injury in your analysis.
-`;
+      injurySection = `
+🚨 **INJURY ALERT**: ${injuryContext.playerName} (${injuryContext.position}) is OUT for ${injuryContext.teamAbbr}. This is a significant absence that impacts the matchup.`;
     }
 
-    const prompt = `You are a professional NFL analyst writing a prediction analysis for StatMind Sports, a sports prediction platform with 79.7% historical accuracy.
-${injuryAlert}
-**Game:** ${away_team} @ ${home_team}
+    const prompt = `You are an ESPN-style NFL analyst writing game analysis for StatMind Sports (79.7% accuracy rate).
 
-**Prediction:** ${predicted_winner} to win with ${winProbability}% probability (${confidence} confidence)
+**MATCHUP**: ${away_team} @ ${home_team}
+**PICK**: ${predicted_winner} (${winProbability}% confidence)
+${injurySection}
 
-**5-Component Analysis Breakdown:**
-${componentScores.map(c => `- ${c.name} (${c.weight} weight): ${c.raw > 0 ? '+' : ''}${c.raw.toFixed(1)} (favors ${c.raw > 0 ? home_team : away_team})`).join('\n')}
+**KEY DATA POINTS**:
+${favoredTeam} Advantages:
+- Elo Rating: ${Math.abs(Math.round(eloScore * 20))} points higher
+- Record: ${home_win_probability > 0.5 ? homeStats.wins : awayStats.wins}-${home_win_probability > 0.5 ? homeStats.losses : awayStats.losses} vs ${home_win_probability > 0.5 ? awayStats.wins : homeStats.wins}-${home_win_probability > 0.5 ? awayStats.losses : homeStats.losses}
+- Scoring: ${home_win_probability > 0.5 ? homeStats.points_per_game?.toFixed(1) : awayStats.points_per_game?.toFixed(1)} PPG vs ${home_win_probability > 0.5 ? awayStats.points_per_game?.toFixed(1) : homeStats.points_per_game?.toFixed(1)} PPG
+- Defense: Allowing ${home_win_probability > 0.5 ? homeStats.points_allowed_per_game?.toFixed(1) : awayStats.points_allowed_per_game?.toFixed(1)} vs ${home_win_probability > 0.5 ? awayStats.points_allowed_per_game?.toFixed(1) : homeStats.points_allowed_per_game?.toFixed(1)} PPG
 
-**Team Statistics:**
+Location Factors:
+- ${home_team} at home: ${homeStats.home_wins || 0}-${(homeStats.home_games - homeStats.home_wins) || 0}
+- ${away_team} on road: ${awayStats.away_wins || 0}-${(awayStats.away_games - awayStats.away_wins) || 0}
 
-${home_team} (Home):
-- Elo Rating: ${homeStats.elo_rating?.toFixed(0) || 'N/A'}
-- Record: ${homeStats.wins || 0}-${homeStats.losses || 0}
-- Home Record: ${homeStats.home_wins || 0}-${(homeStats.home_games - homeStats.home_wins) || 0}
-- Offensive Rating: ${homeStats.offensive_rating?.toFixed(1) || 'N/A'}
-- Defensive Rating: ${homeStats.defensive_rating?.toFixed(1) || 'N/A'}
-- Points Per Game: ${homeStats.points_per_game?.toFixed(1) || 'N/A'}
-- Points Allowed: ${homeStats.points_allowed_per_game?.toFixed(1) || 'N/A'}
+**GAME TYPE**: ${gameNarrative}
 
-${away_team} (Away):
-- Elo Rating: ${awayStats.elo_rating?.toFixed(0) || 'N/A'}
-- Record: ${awayStats.wins || 0}-${awayStats.losses || 0}
-- Away Record: ${awayStats.away_wins || 0}-${(awayStats.away_games - awayStats.away_wins) || 0}
-- Offensive Rating: ${awayStats.offensive_rating?.toFixed(1) || 'N/A'}
-- Defensive Rating: ${awayStats.defensive_rating?.toFixed(1) || 'N/A'}
-- Points Per Game: ${awayStats.points_per_game?.toFixed(1) || 'N/A'}
-- Points Allowed: ${awayStats.points_allowed_per_game?.toFixed(1) || 'N/A'}
+**YOUR TASK**: Write a 2-3 paragraph analysis that sounds like a real NFL analyst breaking down this game. Focus on:
 
-**Top 3 Factors Influencing This Prediction:**
-${topFactors.map((f, i) => `${i + 1}. ${f.name} (${f.weight} weight): ${f.raw > 0 ? '+' : ''}${f.raw.toFixed(1)}`).join('\n')}
+1. **Opening Hook** (1-2 sentences): Start with the pick and WHY it makes sense from a football perspective
+   ${injuryContext ? '- MUST mention the injury impact in your opening' : ''}
+   - Use phrases like: "this matchup favors...", "the key battle is...", "momentum swings toward..."
+   - NO generic statements like "analyzing the data" or "our system predicts"
 
-**Write a 3-4 sentence professional analyst-style prediction reasoning that:**
-1. States the pick and win probability upfront
-2. ${injuryContext ? '**MUST mention the injury impact first**' : 'Highlights 2-3 key factors from the analysis'}
-3. Uses concrete numbers from the statistics
-4. Sounds natural and engaging, like an ESPN analyst
-5. Is informative but concise
+2. **Matchup Analysis** (2-3 sentences): Dive into the actual football factors
+   - Talk about offensive vs defensive strengths
+   - Mention specific advantages (pass rush vs O-line, run game vs run defense, etc.)
+   - Reference the records and recent performance NATURALLY (don't list stats robotically)
+   - Use analyst language: "exploitable weakness", "mismatch advantage", "tough environment"
 
-**Style guidelines:**
-- Write in present tense
-- Be confident but not overstating certainty
-- Use analyst language: "edge," "advantage," "matchup," "trendy," etc.
-- Include specific statistics to support claims
-- NO generic phrases - be specific to this matchup
-${injuryContext ? '- MUST reference the injury in your first sentence' : ''}
-- Keep it under 100 words
+3. **The Bottom Line** (1-2 sentences): Conclude with confidence level and what to watch
+   - Acknowledge if it's a close game or if one team has clear edges
+   - End with insight, not just restating the prediction
 
-Write ONLY the prediction reasoning, no preamble or extra commentary:`;
+**STYLE RULES**:
+- Write in PRESENT TENSE (e.g., "The Chiefs boast a high-powered offense")
+- Be CONVERSATIONAL but PROFESSIONAL
+- Use SPECIFIC football terminology (red zone efficiency, third down defense, pass rush, etc.)
+- Include numbers NATURALLY in sentences, not as bullet points
+- NEVER say: "our algorithm predicts", "based on our data", "the numbers show"
+- DO say: "this shapes up as", "the edge goes to", "expect a battle between", "the key matchup"
+- Keep it under 120 words total
+- Sound confident but not arrogant (${confidence} confidence level)
+
+Write ONLY the analysis - no preamble, no title, no "here's my analysis":`;
 
     return prompt;
+  }
+
+  /**
+   * Helper method to categorize the game narrative
+   */
+  determineGameNarrative(data) {
+    const { home_win_probability, confidence, eloScore } = data;
+    const probDiff = Math.abs(home_win_probability - 0.5);
+
+    if (confidence === 'High') {
+      return 'Clear Favorite Matchup';
+    } else if (probDiff < 0.07) {
+      return 'Toss-Up Game';
+    } else if (Math.abs(eloScore) > 15) {
+      return 'Talent Mismatch';
+    } else {
+      return 'Competitive Matchup';
+    }
   }
 
   /**

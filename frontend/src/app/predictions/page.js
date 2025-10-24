@@ -254,8 +254,8 @@ export default function PredictionsPage() {
           </div>
         </div>
 
-        {/* Stats Summary - Single Green Bar */}
-        {filteredPredictions.length > 0 && (
+        {/* Stats Summary - Single Green Bar (only show for current week with predictions) */}
+        {filteredPredictions.length > 0 && week === getCurrentSeasonWeek().week && (
           <div className="bg-gradient-to-r from-emerald-900/30 to-teal-900/30 border border-emerald-500/30 rounded-xl px-8 py-6 mb-8">
             <div className="flex items-center justify-around">
               <div className="text-center">
