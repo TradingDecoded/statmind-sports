@@ -1,5 +1,6 @@
 // src/services/espnDataService.js
 import pool from '../config/database.js';
+import eloUpdateService from './eloUpdateService.js';
 
 const ESPN_BASE_URL = 'https://site.api.espn.com/apis/site/v2/sports/football/nfl';
 
@@ -165,6 +166,15 @@ class ESPNDataService {
           const result = await pool.query(query, values);
           if (result.rows.length > 0) {
             updated++;
+            // Update Elo ratings for completed games
+            if (isCompleted) {
+              console.log(`  🎯 Updating Elo for completed game: ${event.id}`);
+              try {
+                await eloUpdateService.updateEloAfterGame(event.id);
+              } catch (eloError) {
+                console.error(`  ⚠️  Elo update failed for ${event.id}:`, eloError.message);
+              }
+            }
             const statusEmoji = isCompleted ? '✅' : '🔴 LIVE';
             console.log(`  ${statusEmoji} ${homeTeam.team.abbreviation} ${homeTeam.score} - ${awayTeam.score} ${awayTeam.team.abbreviation}`);
           }
