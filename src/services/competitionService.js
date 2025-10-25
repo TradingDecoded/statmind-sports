@@ -429,10 +429,12 @@ class CompetitionService {
       nextWeekEnd.setHours(15, 50, 0, 0); // 3:50 PM ET
 
       const year = nextWeekStart.getFullYear();
-      const weekNumber = this.getWeekNumber(nextWeekStart);
 
       // Determine NFL week (you may need to adjust this logic)
       const nflWeek = this.calculateNFLWeek(nextWeekStart);
+
+      // Use NFL week for week_number to ensure consistency
+      const weekNumber = nflWeek;
 
       await db.query(
         `INSERT INTO weekly_competitions 
