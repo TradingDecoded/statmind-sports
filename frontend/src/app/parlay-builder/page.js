@@ -14,7 +14,6 @@ export default function ParlayBuilderPage() {
 
   const [availableGames, setAvailableGames] = useState([]);
   const [selectedPicks, setSelectedPicks] = useState([]);
-  const [parlayName, setParlayName] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [calculating, setCalculating] = useState(false);
@@ -27,6 +26,12 @@ export default function ParlayBuilderPage() {
   const [userParlays, setUserParlays] = useState([]);
   const [isPracticeMode, setIsPracticeMode] = useState(true);
   const [upgradingParlay, setUpgradingParlay] = useState(null);
+
+  // Remove a pick from the parlay
+  const handleRemovePick = (gameId) => {
+    setSelectedPicks(prev => prev.filter(pick => pick.game_id !== gameId));
+    setCalculation(null); // Reset calculation when picks change
+  };
 
   useEffect(() => {
     // Don't redirect while still checking auth
@@ -108,11 +113,10 @@ export default function ParlayBuilderPage() {
     }
   };
 
-  const handleUpgradeParlay = async (parlayId, parlayName) => {
+  const handleUpgradeParlay = async (parlayId) => {
     const confirmed = window.confirm(
-      `Upgrade "${parlayName}" to competition entry for 100 SMS Bucks?`
+      `Upgrade this parlay to competition entry for 100 SMS Bucks?`
     );
-
     if (!confirmed) return;
 
     setUpgradingParlay(parlayId);
@@ -240,11 +244,6 @@ export default function ParlayBuilderPage() {
       return;
     }
 
-    if (!parlayName.trim()) {
-      alert('Please enter a parlay name');
-      return;
-    }
-
     setSaving(true);
     try {
       const token = localStorage.getItem('authToken');
@@ -266,7 +265,6 @@ export default function ParlayBuilderPage() {
       });
 
       console.log('💾 Saving parlay with data:', {
-        parlayName,
         season: currentSeason,
         week: currentWeek,
         games: completeGamesData
@@ -279,7 +277,6 @@ export default function ParlayBuilderPage() {
           'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
-          parlayName: parlayName,
           season: currentSeason,
           week: currentWeek,
           games: completeGamesData,
@@ -299,7 +296,6 @@ export default function ParlayBuilderPage() {
       alert('Parlay saved successfully! 🎉');
       // Reset form to build another parlay
       setSelectedPicks([]);
-      setParlayName('');
       setCalculation(null);
       // Refresh the games and user parlays
       fetchAvailableGames();
@@ -561,21 +557,6 @@ export default function ParlayBuilderPage() {
                     </div>
                   ))}
 
-                  {/* Parlay Name Input */}
-                  <div className="mt-4">
-                    <label className="block text-slate-400 text-sm font-medium mb-2">
-                      Parlay Name
-                    </label>
-                    <input
-                      type="text"
-                      value={parlayName}
-                      onChange={(e) => setParlayName(e.target.value)}
-                      placeholder="Enter parlay name..."
-                      maxLength={100}
-                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition"
-                    />
-                  </div>
-
                   {/* Parlay Stats - keep existing code */}
                   {calculation && (
                     <div className="bg-slate-800/30 rounded-lg p-4 mt-4 space-y-2">
@@ -675,7 +656,6 @@ export default function ParlayBuilderPage() {
                     disabled={
                       saving ||
                       selectedPicks.length < 2 ||
-                      !parlayName.trim() ||
                       (!isPracticeMode && (user?.sms_bucks || 0) < 100) ||
                       (!isPracticeMode && user?.membership_tier === 'free')
                     }
@@ -703,7 +683,28 @@ export default function ParlayBuilderPage() {
                     >
                       <div className="flex items-start justify-between mb-2">
                         <div>
-                          <h4 className="text-white font-semibold text-sm">{parlay.parlay_name}</h4>
+                          {/* Team Logos Display */}
+                          <div className="flex items-center gap-1.5 mb-1">
+                            {parlay.games && parlay.games.slice(0, 4).map((game, idx) => (
+                              <div key={idx} className="relative">
+                                <img
+                                  src={getTeamLogo(game.picked_winner)}
+                                  alt={game.picked_winner}
+                                  className="w-8 h-8 object-contain bg-slate-800/50 rounded-md p-1 border border-slate-700"
+                                  onError={(e) => {
+                                    e.target.src = '/images/nfl-logo.png';
+                                  }}
+                                />
+                              </div>
+                            ))}
+                            {parlay.games && parlay.games.length > 4 && (
+                              <div className="w-8 h-8 bg-slate-800/50 rounded-md border border-slate-700 flex items-center justify-center">
+                                <span className="text-slate-400 text-xs font-semibold">
+                                  +{parlay.games.length - 4}
+                                </span>
+                              </div>
+                            )}
+                          </div>
                           <p className="text-slate-400 text-xs mt-1">
                             {parlay.leg_count} legs • {parlay.risk_level} risk
                           </p>
@@ -736,7 +737,7 @@ export default function ParlayBuilderPage() {
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation(); // Prevent card click
-                                    handleUpgradeParlay(parlay.id, parlay.parlay_name);
+                                    handleUpgradeParlay(parlay.id);
                                   }}
                                   disabled={upgradingParlay === parlay.id}
                                   className="text-xs px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-600 text-white rounded font-semibold transition-colors disabled:cursor-not-allowed"

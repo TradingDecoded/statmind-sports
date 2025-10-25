@@ -568,9 +568,28 @@ export default function MyParlaysPage() {
                   {/* Compact Parlay Header */}
                   <div className="flex items-start justify-between mb-3">
                     <div>
-                      <h3 className="text-lg font-semibold text-white mb-1">
-                        {parlay.parlay_name}
-                      </h3>
+                      {/* Team Logos Display */}
+                      <div className="flex items-center gap-2 mb-1">
+                        {parlay.games && parlay.games.slice(0, 5).map((game, idx) => (
+                          <div key={idx} className="relative">
+                            <img
+                              src={getTeamLogo(game.picked_winner)}
+                              alt={game.picked_winner}
+                              className="w-10 h-10 object-contain bg-slate-800 rounded-lg p-1 border border-slate-700"
+                              onError={(e) => {
+                                e.target.src = '/images/nfl-logo.png';
+                              }}
+                            />
+                          </div>
+                        ))}
+                        {parlay.games && parlay.games.length > 5 && (
+                          <div className="w-10 h-10 bg-slate-800 rounded-lg border border-slate-700 flex items-center justify-center">
+                            <span className="text-slate-400 text-xs font-semibold">
+                              +{parlay.games.length - 5}
+                            </span>
+                          </div>
+                        )}
+                      </div>
                       <div className="flex items-center gap-2 text-xs text-slate-400">
                         <span>Season {parlay.season}</span>
                         <span>•</span>

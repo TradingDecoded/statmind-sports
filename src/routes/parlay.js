@@ -115,10 +115,7 @@ router.post('/calculate', requireAuth, async (req, res) => {
 router.post('/create',
   requireAuth,
   [
-    body('parlayName')
-      .trim()
-      .isLength({ min: 1, max: 100 })
-      .withMessage('Parlay name must be 1-100 characters'),
+    // parlayName validation removed - auto-generated in service
     body('season')
       .isInt()
       .withMessage('Season must be a valid year'),

@@ -141,8 +141,19 @@ class ParlayService {
     try {
       await client.query('BEGIN');
 
-      const { parlayName, season, week, games } = parlayData;
+      const { season, week, games } = parlayData;
       const legCount = games.length;
+
+      // ALWAYS auto-generate parlay name (no user input)
+      const parlayCountResult = await client.query(
+        'SELECT COUNT(*) as count FROM user_parlays WHERE user_id = $1',
+        [userId]
+      );
+
+      const parlayNumber = parseInt(parlayCountResult.rows[0].count) + 1;
+      const parlayName = `Parlay #${parlayNumber}`;
+
+      console.log(`🤖 Auto-generated parlay name: "${parlayName}"`);
 
       // Get current year/week FIRST (needed for multiple checks)
       const currentDate = new Date();
