@@ -475,14 +475,14 @@ class PredictionEngine {
         home_win_probability: homeWinProb,
         away_win_probability: awayWinProb,
         confidence,
-        eloScore,
-        powerScore,
-        situationalScore,
-        matchupScore,
-        recentFormScore,
+        elo_score: eloScore,           // ← Changed from eloScore
+        power_score: powerScore,       // ← Changed from powerScore
+        situational_score: situationalScore,  // ← Changed from situationalScore
+        matchup_score: matchupScore,   // ← Changed from matchupScore
+        recent_form_score: recentFormScore,   // ← Changed from recentFormScore
         homeStats,
         awayStats,
-        injuryContext  // <-- PASS INJURY CONTEXT TO AI
+        injuryContext
       };
 
       // Generate AI reasoning (with injury awareness)
